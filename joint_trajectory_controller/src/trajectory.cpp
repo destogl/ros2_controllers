@@ -97,30 +97,43 @@ Trajectory::sample(
       trajectory_msgs::msg::JointTrajectoryPoint & second_state,
       const size_t dim, const double delta_t)
     {
-      // Previous position must be known already
-      if (first_state.positions.empty()) {
-        throw std::runtime_error("Integration failed. A required position term is unknown.");
-      }
-      // We can skip these terms, e.g. if second_state.positions or .accelerations is missing
       // Use references for readability
+      const auto & have_first_positions = !first_state.positions.empty();
+      const auto & have_second_positions = !second_state.positions.empty();
       const auto & have_first_velocities = !first_state.velocities.empty();
+      const auto & have_second_velocities = !second_state.velocities.empty();
       const auto & have_first_accelerations = !first_state.accelerations.empty();
       const auto & have_second_accelerations = !second_state.accelerations.empty();
 
-      // Calculate missing terms
+      // Previous position must be known already.
+      // Need to know (1st state position, second state position) or (1st state velocity) or (2nd state velocity), at least, to know second state velocity.
+      if (!have_first_positions || (!have_second_positions && !have_second_velocities))
+      {
+        throw std::runtime_error("Integration failed. A required term is unknown.");
+      }
+
+      // Calculate missing terms in the second state
       if (second_state.velocities.empty()) {
         second_state.velocities.resize(dim);
         for (size_t i = 0; i < dim; ++i) {
-          if (have_first_velocities) {
-            second_state.velocities[i] += first_state.velocities[i];
+          if (!have_first_velocities)
+          {
+            // No velocities are known so use a first-order estimate from position
+            second_state.velocities[i] = (first_state.positions[i] + second_state.positions[i]) / delta_t;
           }
-          if (have_first_accelerations && have_second_accelerations) {
-            second_state.velocities[i] +=
-              (first_state.accelerations[i] + second_state.accelerations[i]) * 0.5 * delta_t;
-          } else if (have_first_accelerations) {
-            second_state.velocities[i] += first_state.accelerations[i] * delta_t;
-          } else if (have_second_accelerations) {
-            second_state.velocities[i] += second_state.accelerations[i] * delta_t;
+          else
+          {
+            if (have_first_velocities) {
+              second_state.velocities[i] += first_state.velocities[i];
+            }
+            if (have_first_accelerations && have_second_accelerations) {
+              second_state.velocities[i] +=
+                (first_state.accelerations[i] + second_state.accelerations[i]) * 0.5 * delta_t;
+            } else if (have_first_accelerations) {
+              second_state.velocities[i] += first_state.accelerations[i] * delta_t;
+            } else if (have_second_accelerations) {
+              second_state.velocities[i] += second_state.accelerations[i] * delta_t;
+            }
           }
         }
       }
