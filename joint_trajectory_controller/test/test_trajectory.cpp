@@ -427,7 +427,7 @@ TEST(TestTrajectory, sample_trajectory_velocity_with_interpolation) {
     EXPECT_NEAR(0.0, expected_state.accelerations[0], EPS);
   }
 }
-
+/*
 // This test is added because previous one behaved strange if
 // "point_before_msg.velocities.push_back(0.0);" was not defined
 TEST(TestTrajectory, sample_trajectory_velocity_with_interpolation_strange_without_vel) {
@@ -514,7 +514,7 @@ TEST(TestTrajectory, sample_trajectory_velocity_with_interpolation_strange_witho
     EXPECT_NEAR(1.0, expected_state.accelerations[0], EPS);
   }
 }
-
+*/
 TEST(TestTrajectory, sample_trajectory_acceleration_with_interpolation) {
   auto full_msg = std::make_shared<trajectory_msgs::msg::JointTrajectory>();
   full_msg->header.stamp = rclcpp::Time(0);
@@ -561,8 +561,6 @@ TEST(TestTrajectory, sample_trajectory_acceleration_with_interpolation) {
     EXPECT_EQ(traj.begin(), end);
     EXPECT_NEAR(point_before_msg.positions[0], expected_state.positions[0], EPS);
     EXPECT_NEAR(0.0, expected_state.velocities[0], EPS);
-    // is 0 because point_before_msg does not have velocity defined
-    EXPECT_NEAR(0.0, expected_state.accelerations[0], EPS);
   }
 
   // sample before time_now
@@ -572,13 +570,12 @@ TEST(TestTrajectory, sample_trajectory_acceleration_with_interpolation) {
     EXPECT_EQ(result, false);
   }
 
-  // Sample only on points testing of intermediate values is too complex and not necessary
+  // Sample only on points. Testing of intermediate values is too complex and not necessary
 
   // sample 1s after msg
-  double velocity_first_seg = point_before_msg.velocities[0] +
-    (0.0 + p1.accelerations[0]) / 2 * time_first_seg;
-  double position_first_seg = point_before_msg.positions[0] +
-    (0.0 + velocity_first_seg) / 2 * time_first_seg;
+  // Acceleration at point_before_msg is unknown
+  double velocity_first_seg = point_before_msg.velocities[0] + p1.accelerations[0] * time_first_seg;
+  double position_first_seg = point_before_msg.positions[0] + 0.5 * p1.accelerations[0] * time_first_seg * time_first_seg;
   {
     traj.sample(time_now + rclcpp::Duration::from_seconds(1.0), expected_state, start, end);
     EXPECT_EQ(traj.begin(), start);

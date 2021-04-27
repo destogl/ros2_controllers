@@ -105,21 +105,23 @@ Trajectory::sample(
       const auto & have_first_accelerations = !first_state.accelerations.empty();
       const auto & have_second_accelerations = !second_state.accelerations.empty();
 
-      // Previous position must be known already.
-      // Need to know (1st state position, second state position) or (1st state velocity) or (2nd state velocity), at least, to know second state velocity.
-      if (!have_first_positions || (!have_second_positions && !have_second_velocities))
+      // Previous position must be known to integrate.
+      // Need to know (1st state position, second state position) or
+      // (1st state velocity) or (2nd state velocity), at least, to know second state velocity.
+      if (!have_first_positions && (!have_second_positions || (!have_first_velocities && !have_second_velocities)))
       {
         throw std::runtime_error("Integration failed. A required term is unknown.");
       }
 
       // Calculate missing terms in the second state
-      if (second_state.velocities.empty()) {
+      if (!have_second_velocities) {
         second_state.velocities.resize(dim);
         for (size_t i = 0; i < dim; ++i) {
           if (!have_first_velocities)
           {
             // No velocities are known so use a first-order estimate from position
-            second_state.velocities[i] = (first_state.positions[i] + second_state.positions[i]) / delta_t;
+            second_state.velocities[i] =
+              (first_state.positions[i] + second_state.positions[i]) / delta_t;
           }
           else
           {
@@ -137,7 +139,7 @@ Trajectory::sample(
           }
         }
       }
-      if (second_state.positions.empty()) {
+      if (!have_second_positions) {
         second_state.positions.resize(dim);
         for (size_t i = 0; i < dim; ++i) {
           second_state.positions[i] = first_state.positions[i];
