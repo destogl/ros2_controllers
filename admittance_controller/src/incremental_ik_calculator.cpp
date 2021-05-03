@@ -38,6 +38,8 @@ IncrementalIKCalculator::IncrementalIKCalculator(std::shared_ptr<rclcpp::Node>& 
 bool IncrementalIKCalculator::convertCartesianDeltasToJointDeltas(Eigen::VectorXd delta_x, std::string& delta_x_frame, Eigen::VectorXd& delta_theta)
 {
   // Transform delta_x to the moveit_jacobian_frame
+  // TODO: replace when this PR to tf2_eigen is merged
+  // https://github.com/ros2/geometry2/pull/406
   try
   {
     // 4x4 transformation matrix
@@ -49,7 +51,7 @@ bool IncrementalIKCalculator::convertCartesianDeltasToJointDeltas(Eigen::VectorX
     // upper left 3x3 block is the rotation part
     twist_transform.block(0,0,3,3) = affine_transform.rotation();
     // upper right 3x3 block is all zeros
-    twist_transform.block(0,4,3,3) = Eigen::MatrixXd::Zero(3,3);
+    twist_transform.block(0,3,3,3) = Eigen::MatrixXd::Zero(3,3);
     // lower left 3x3 block is tricky. See https://core.ac.uk/download/pdf/154240607.pdf
     Eigen::MatrixXd pos_vector_3x3(3,3);
     pos_vector_3x3(0,0) = 0;  pos_vector_3x3(0,1) = -affine_transform.translation().z();  pos_vector_3x3(0,2) = affine_transform.translation().y();
