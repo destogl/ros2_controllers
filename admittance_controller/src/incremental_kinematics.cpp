@@ -46,11 +46,13 @@ bool IncrementalKinematics::convertCartesianDeltasToJointDeltas(const std::vecto
     const Eigen::Isometry3d affine_transform = tf2::transformToEigen(ik_base_to_tip_tf);
 
     // Build the 6x6 transformation matrix
+    // TODO: replace when this PR to tf2_eigen is merged
+    // https://github.com/ros2/geometry2/pull/406
     Eigen::MatrixXd twist_transform(6,6);
     // upper left 3x3 block is the rotation part
     twist_transform.block(0,0,3,3) = affine_transform.rotation();
     // upper right 3x3 block is all zeros
-    twist_transform.block(0,4,3,3) = Eigen::MatrixXd::Zero(3,3);
+    twist_transform.block(0,3,3,3) = Eigen::MatrixXd::Zero(3,3);
     // lower left 3x3 block is tricky. See https://core.ac.uk/download/pdf/154240607.pdf
     Eigen::MatrixXd pos_vector_3x3(3,3);
     pos_vector_3x3(0,0) = 0;  pos_vector_3x3(0,1) = -affine_transform.translation().z();  pos_vector_3x3(0,2) = affine_transform.translation().y();
