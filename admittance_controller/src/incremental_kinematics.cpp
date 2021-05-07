@@ -16,7 +16,7 @@
 
 #include "admittance_controller/incremental_kinematics.hpp"
 
-#include "Eigen/VectorXf"
+#include "Eigen/VectorXd"
 #include "tf2_eigen/tf2_eigen.h"
 
 namespace admittance_controller
@@ -34,16 +34,16 @@ IncrementalKinematics::IncrementalKinematics(const std::shared_ptr<rclcpp::Node>
   // By default, the MoveIt Jacobian frame is the last link
 }
 
-bool IncrementalKinematics::convertCartesianDeltasToJointDeltas(const std::vector<double> & delta_x_vec, const geometry_msgs::msg::TransformStamped & ik_base_to_tip_trafo, std::vector<double> & delta_theta_vec)
+bool IncrementalKinematics::convertCartesianDeltasToJointDeltas(const std::vector<double> & delta_x_vec, const geometry_msgs::msg::TransformStamped & ik_base_to_tip_tf, std::vector<double> & delta_theta_vec)
 {
   // see here for this conversion: https://stackoverflow.com/questions/26094379/typecasting-eigenvectorxd-to-stdvector
-  Eigen::VectorXf delta_x = Eigen::Map<Eigen::VectorXf, Eigen::Unaligned>(&delta_x_vec[0], delta_x_vec.size());
+  Eigen::VectorXd delta_x = Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(&delta_x_vec[0], delta_x_vec.size());
 
   // Transform delta_x to the moveit_jacobian_frame
   try
   {
     // 4x4 transformation matrix
-    const Eigen::Isometry3d affine_transform = tf2::transformToEigen(ik_base_to_tip_trafo);
+    const Eigen::Isometry3d affine_transform = tf2::transformToEigen(ik_base_to_tip_tf);
 
     // Build the 6x6 transformation matrix
     Eigen::MatrixXd twist_transform(6,6);
@@ -73,7 +73,7 @@ bool IncrementalKinematics::convertCartesianDeltasToJointDeltas(const std::vecto
   svd_ = Eigen::JacobiSVD<Eigen::MatrixXd>(jacobian_, Eigen::ComputeThinU | Eigen::ComputeThinV);
   matrix_s_ = svd_.singularValues().asDiagonal();
   pseudo_inverse_ = svd_.matrixV() * matrix_s_.inverse() * svd_.matrixU().transpose();
-  Eigen::VectorXf  delta_theta = pseudo_inverse_ * delta_x;
+  Eigen::VectorXd  delta_theta = pseudo_inverse_ * delta_x;
 
   std::vector<double> delta_theta_v(&delta_theta[0], delta_theta.data() + delta_theta.cols() * delta_theta.rows());
   delta_theta_vec = delta_theta_v;
@@ -81,7 +81,7 @@ bool IncrementalKinematics::convertCartesianDeltasToJointDeltas(const std::vecto
   return true;
 }
 
-bool IncrementalKinematics::convertJointDeltasToCartesianDeltas(const std::vector<double> &  delta_theta_vec, const geometry_msgs::msg::TransformStamped & ik_base_to_tip_trafo, std::vector<double> & delta_x_vec)
+bool IncrementalKinematics::convertJointDeltasToCartesianDeltas(const std::vector<double> &  delta_theta_vec, const geometry_msgs::msg::TransformStamped & ik_base_to_tip_tf, std::vector<double> & delta_x_vec)
 {
   // TODO(andyz): Please add here FK implementation
 }
