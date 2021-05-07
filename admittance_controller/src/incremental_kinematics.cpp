@@ -40,14 +40,14 @@ bool IncrementalKinematics::convertCartesianDeltasToJointDeltas(const std::vecto
   Eigen::VectorXd delta_x = Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(&delta_x_vec[0], delta_x_vec.size());
 
   // Transform delta_x to the moveit_jacobian_frame
+  // TODO: replace when this PR to tf2_eigen is merged
+  // https://github.com/ros2/geometry2/pull/406
   try
   {
     // 4x4 transformation matrix
     const Eigen::Isometry3d affine_transform = tf2::transformToEigen(ik_base_to_tip_tf);
 
     // Build the 6x6 transformation matrix
-    // TODO: replace when this PR to tf2_eigen is merged
-    // https://github.com/ros2/geometry2/pull/406
     Eigen::MatrixXd twist_transform(6,6);
     // upper left 3x3 block is the rotation part
     twist_transform.block(0,0,3,3) = affine_transform.rotation();
@@ -85,7 +85,49 @@ bool IncrementalKinematics::convertCartesianDeltasToJointDeltas(const std::vecto
 
 bool IncrementalKinematics::convertJointDeltasToCartesianDeltas(const std::vector<double> &  delta_theta_vec, const geometry_msgs::msg::TransformStamped & ik_base_to_tip_tf, std::vector<double> & delta_x_vec)
 {
-  // TODO(andyz): Please add here FK implementation
+  // see here for this conversion: https://stackoverflow.com/questions/26094379/typecasting-eigenvectorxd-to-stdvector
+  Eigen::VectorXd delta_theta = Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(&delta_theta_vec[0], delta_theta_vec.size());
+
+  // Multiply with the Jacobian to get delta_x
+  jacobian_ = kinematic_state_->getJacobian(joint_model_group_);
+  // delta_x will be in the working frame of MoveIt
+  Eigen::VectorXd delta_x = jacobian_ * delta_theta;
+
+  // Transform delta_x to the tip frame
+  // TODO: replace when this PR to tf2_eigen is merged
+  // https://github.com/ros2/geometry2/pull/406
+  try
+  {
+    // 4x4 transformation matrix
+    const Eigen::Isometry3d affine_transform = tf2::transformToEigen(ik_base_to_tip_tf);
+
+    // Build the 6x6 transformation matrix
+    Eigen::MatrixXd twist_transform(6,6);
+    // upper left 3x3 block is the rotation part
+    twist_transform.block(0,0,3,3) = affine_transform.rotation();
+    // upper right 3x3 block is all zeros
+    twist_transform.block(0,3,3,3) = Eigen::MatrixXd::Zero(3,3);
+    // lower left 3x3 block is tricky. See https://core.ac.uk/download/pdf/154240607.pdf
+    Eigen::MatrixXd pos_vector_3x3(3,3);
+    pos_vector_3x3(0,0) = 0;  pos_vector_3x3(0,1) = -affine_transform.translation().z();  pos_vector_3x3(0,2) = affine_transform.translation().y();
+    pos_vector_3x3(1, 0) = affine_transform.translation().z();  pos_vector_3x3(1,1) = 0;  pos_vector_3x3(1,2) = -affine_transform.translation().x();
+    pos_vector_3x3(2, 0) = -affine_transform.translation().y();  pos_vector_3x3(2,1) = affine_transform.translation().x();  pos_vector_3x3(1,2) = 0;
+    twist_transform.block(3,0,3,3) = pos_vector_3x3 * affine_transform.rotation();
+    // lower right 3x3 block is the rotation part
+    twist_transform.block(3,3,3,3) = affine_transform.rotation();
+
+    delta_x = twist_transform * delta_x;
+  }
+  catch (tf2::TransformException & ex)
+  {
+    RCLCPP_ERROR(node_->get_logger(), "Transformation of wrench failed.");
+    return false;
+  }
+
+  std::vector<double> delta_x_v(&delta_x[0], delta_x.data() + delta_x.cols() * delta_x.rows());
+  delta_x_vec = delta_x_v;
+
+  return true;
 }
 
 }  // namespace admittance_controller
