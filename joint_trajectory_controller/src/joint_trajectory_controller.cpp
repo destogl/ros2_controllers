@@ -315,40 +315,6 @@ void JointTrajectoryController::read_state_from_hardware(JointTrajectoryPoint & 
   }
 }
 
-void JointTrajectoryController::read_state_from_hardware(JointTrajectoryPoint & state)
-{
-  const auto joint_num = joint_names_.size();
-  auto assign_point_from_interface = [&, joint_num](
-    std::vector<double> & trajectory_point_interface, const auto & joint_inteface)
-    {
-      for (auto index = 0ul; index < joint_num; ++index) {
-        trajectory_point_interface[index] = joint_inteface[index].get().get_value();
-      }
-    };
-
-  // Assign values from the hardware
-  // Position states always exist
-  assign_point_from_interface(state.positions, joint_state_interface_[0]);
-  // velocity and acceleration states are optional
-  if (check_if_interface_type_exists(state_interface_types_, hardware_interface::HW_IF_VELOCITY)) {
-    assign_point_from_interface(state.velocities, joint_state_interface_[1]);
-    // Acceleration is used only in combination with velocity
-    if (check_if_interface_type_exists(
-        state_interface_types_,
-        hardware_interface::HW_IF_ACCELERATION))
-    {
-      assign_point_from_interface(state.accelerations, joint_state_interface_[2]);
-    } else {
-      // Make empty so the property is ignored during interpolation
-      state.accelerations.clear();
-    }
-  } else {
-    // Make empty so the property is ignored during interpolation
-    state.velocities.clear();
-    state.accelerations.clear();
-  }
-}
-
 rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn
 JointTrajectoryController::on_configure(const rclcpp_lifecycle::State &)
 {
