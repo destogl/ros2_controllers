@@ -25,14 +25,14 @@
 namespace admittance_controller
 {
 
-class IncrementalIKCalculator
+class IncrementalKinematics
 {
 public:
   /**
    * \brief Create an object which takes Cartesian delta-x and converts to joint delta-theta.
    * It uses the Jacobian from MoveIt.
    */
-  IncrementalIKCalculator(const std::shared_ptr<rclcpp::Node> & node, const std::string & group_name);
+  IncrementalKinematics(const std::shared_ptr<rclcpp::Node> & node, const std::string & group_name);
 
   /**
    * \brief Convert Cartesian delta-x to joint delta-theta, using the Jacobian.

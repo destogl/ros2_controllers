@@ -14,14 +14,14 @@
 //
 /// \author: Andy Zelenak
 
-#include "admittance_controller/incremental_ik_calculator.hpp"
+#include "admittance_controller/incremental_kinematics.hpp"
 
 #include "Eigen/VectorXf"
 #include "tf2_eigen/tf2_eigen.h"
 
 namespace admittance_controller
 {
-IncrementalIKCalculator::IncrementalIKCalculator(const std::shared_ptr<rclcpp::Node> & node, const std::string & group_name) : node_(node)
+IncrementalKinematics::IncrementalKinematics(const std::shared_ptr<rclcpp::Node> & node, const std::string & group_name) : node_(node)
 {
   // TODO(andyz): Parameterize robot description and joint group
   std::unique_ptr<robot_model_loader::RobotModelLoader> model_loader_ptr =
@@ -34,7 +34,7 @@ IncrementalIKCalculator::IncrementalIKCalculator(const std::shared_ptr<rclcpp::N
   // By default, the MoveIt Jacobian frame is the last link
 }
 
-bool IncrementalIKCalculator::convertCartesianDeltasToJointDeltas(const std::vector<double> & delta_x_vec, const geometry_msgs::msg::TransformStamped & ik_base_to_tip_trafo, std::vector<double> & delta_theta_vec)
+bool IncrementalKinematics::convertCartesianDeltasToJointDeltas(const std::vector<double> & delta_x_vec, const geometry_msgs::msg::TransformStamped & ik_base_to_tip_trafo, std::vector<double> & delta_theta_vec)
 {
   // see here for this conversion: https://stackoverflow.com/questions/26094379/typecasting-eigenvectorxd-to-stdvector
   Eigen::VectorXf delta_x = Eigen::Map<Eigen::VectorXf, Eigen::Unaligned>(&delta_x_vec[0], delta_x_vec.size());
@@ -81,7 +81,7 @@ bool IncrementalIKCalculator::convertCartesianDeltasToJointDeltas(const std::vec
   return true;
 }
 
-bool IncrementalIKCalculator::convertJointDeltasToCartesianDeltas(const std::vector<double> &  delta_theta_vec, const geometry_msgs::msg::TransformStamped & ik_base_to_tip_trafo, std::vector<double> & delta_x_vec)
+bool IncrementalKinematics::convertJointDeltasToCartesianDeltas(const std::vector<double> &  delta_theta_vec, const geometry_msgs::msg::TransformStamped & ik_base_to_tip_trafo, std::vector<double> & delta_x_vec)
 {
   // TODO(andyz): Please add here FK implementation
 }
