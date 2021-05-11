@@ -356,9 +356,6 @@ controller_interface::return_type AdmittanceRule::get_controller_state(
   state_message.measured_force_endeffector_frame = measured_force_control_frame_;
   state_message.desired_pose = desired_pose_;
   state_message.relative_desired_pose = relative_desired_pose_;
-//   state_message.desired_joint_states = desired_pose_;
-//   state_message.actual_joint_states.positi = desired_pose_;
-  //   state_message.error_joint_state = desired_pose_;
 
   return controller_interface::return_type::OK;
 }

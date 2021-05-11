@@ -102,6 +102,26 @@ if(BUILD_TESTING)
     hardware_interface
     ros2_control_test_assets
   )
+
+  find_package(ament_cmake_gtest REQUIRED)
+  find_package(launch_testing_ament_cmake REQUIRED)
+  ament_find_gtest()
+
+  include_directories(${GTEST_INCLUDE_DIRS})
+  include_directories(${GMOCK_INCLUDE_DIRS})
+
+  add_executable(test_admittance_controller_exe test/test_admittance_controller_exe.cpp)
+  target_include_directories(test_admittance_controller_exe PRIVATE include)
+  target_link_libraries(test_admittance_controller_exe admittance_controller ${GTEST_LIBRARIES} ${GMOCK_LIBRARIES})
+  ament_target_dependencies(
+    test_admittance_controller_exe
+    control_msgs
+    controller_interface
+    hardware_interface
+    ros2_control_test_assets
+  )
+  add_launch_test(test/test_admittance_controller_exe.launch.py
+    ARGS "test_exe:=$<TARGET_FILE:test_admittance_controller_exe>")
 endif()
 
 ament_export_include_directories(
