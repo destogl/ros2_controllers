@@ -326,13 +326,18 @@ controller_interface::return_type AdmittanceRule::update(
 
   // Get the target pose
   geometry_msgs::msg::PoseStamped target_pose;
+  target_pose.pose.position.x = transform_ik_base_tip.transform.translation.x;
+  target_pose.pose.position.y = transform_ik_base_tip.transform.translation.y;
+  target_pose.pose.position.z = transform_ik_base_tip.transform.translation.z;
   target_pose.header.frame_id = ik_tip_frame_;
-  target_pose.pose.position.x = target_ik_tip_deltas_vec.at(0);
-  target_pose.pose.position.y = target_ik_tip_deltas_vec.at(1);
-  target_pose.pose.position.z = target_ik_tip_deltas_vec.at(2);
+  target_pose.pose.position.x += target_ik_tip_deltas_vec.at(0);
+  target_pose.pose.position.y += target_ik_tip_deltas_vec.at(1);
+  target_pose.pose.position.z += target_ik_tip_deltas_vec.at(2);
 
-  tf2::Quaternion q;
-  q.setRPY(target_ik_tip_deltas_vec.at(3), target_ik_tip_deltas_vec.at(4), target_ik_tip_deltas_vec.at(5));
+  tf2::Quaternion q(transform_ik_base_tip.transform.rotation.x, transform_ik_base_tip.transform.rotation.y, transform_ik_base_tip.transform.rotation.z, transform_ik_base_tip.transform.rotation.w);
+  tf2::Quaternion q_rot;
+  q_rot.setRPY(target_ik_tip_deltas_vec.at(3), target_ik_tip_deltas_vec.at(4), target_ik_tip_deltas_vec.at(5));
+  q = q_rot * q;
   target_pose.pose.orientation.w = q.w();
   target_pose.pose.orientation.x = q.x();
   target_pose.pose.orientation.y = q.y();
