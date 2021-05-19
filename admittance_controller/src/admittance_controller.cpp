@@ -500,8 +500,7 @@ controller_interface::return_type AdmittanceController::update()
     }
   }
 
-  auto ft_values = force_torque_sensor_->get_values_as_message();
-
+  geometry_msgs::msg::Wrench ft_values = force_torque_sensor_->get_values_as_message();
   auto duration_since_last_call = get_node()->now() - previous_time_;
 
   // TODO(destogl): Enable this when unified mode is used
