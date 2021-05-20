@@ -229,17 +229,19 @@ controller_interface::return_type AdmittanceRule::update(
   // Convert all data to arrays for simpler calculation
   convert_message_to_array(target_pose_control_frame_, target_pose_control_frame_arr_);
   convert_message_to_array(current_pose_control_frame_, current_pose_control_frame_arr_);
+  RCLCPP_INFO_STREAM(rclcpp::get_logger("AdmittanceRule"), "current_pose_control_frame_(x): " << current_pose_control_frame_.pose.position.x);
+  RCLCPP_INFO_STREAM(rclcpp::get_logger("AdmittanceRule"), "current_pose_control_frame_(y): " << current_pose_control_frame_.pose.position.y);
 
   std::array<double, 6> pose_error_vec;
 
   for (auto i = 0u; i < 6; ++i) {
-    pose_error_vec[i] = current_pose_control_frame_arr_[i] - target_pose_control_frame_arr_[i];
+    pose_error_vec[i] = target_pose_control_frame_arr_[i] - current_pose_control_frame_arr_[i];
     if (i >= 3) {
-      pose_error_vec[i] = angles::normalize_angle(current_pose_control_frame_arr_[i]) -
-      angles::normalize_angle(target_pose_control_frame_arr_[i]);
+      pose_error_vec[i] = angles::normalize_angle(angles::normalize_angle(target_pose_control_frame_arr_[i] - current_pose_control_frame_arr_[i]));
     }
-//     RCLCPP_INFO(rclcpp::get_logger("AdmittanceRule"),
-//                 "Pose error [%zu]: %e", pose_error_vec[i]);
+
+    if (std::fabs(pose_error_vec[i]) < 1e-5)
+      pose_error_vec[i] = 0;
   }
 
   process_force_measurements(measured_wrench);
@@ -260,7 +262,7 @@ controller_interface::return_type AdmittanceRule::update(
 
   // Use Jacobian-based IK
   std::vector<double> relative_desired_pose_vec(relative_desired_pose_arr_.begin(), relative_desired_pose_arr_.end());
-  if (ik_->convertCartesianDeltasToJointDeltas(
+  if (ik_->convert_cartesian_deltas_to_joint_deltas(
     relative_desired_pose_vec, transform, relative_desired_joint_state_vec_)){
     for (auto i = 0u; i < desired_joint_state.positions.size(); ++i) {
       desired_joint_state.positions[i] = current_joint_state.positions[i] + relative_desired_joint_state_vec_[i];
@@ -297,8 +299,10 @@ controller_interface::return_type AdmittanceRule::update(
     return controller_interface::return_type::ERROR;
   }
 
+  ik_->update_robot_state(current_joint_state);
+
   // Get cartesian deltas in the IK tip frame
-  if (ik_->convertJointDeltasToCartesianDeltas(target_joint_deltas_vec, transform_ik_base_tip, target_ik_tip_deltas_vec)) {
+  if (ik_->convert_joint_deltas_to_cartesian_deltas(target_joint_deltas_vec, transform_ik_base_tip, target_ik_tip_deltas_vec)) {
   } else {
     RCLCPP_ERROR(rclcpp::get_logger("AdmittanceRule"), "Conversion of joint deltas to Cartesian deltas failed. Sending current joint values to the robot.");
     desired_joint_state = current_joint_state;

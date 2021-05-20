@@ -42,7 +42,7 @@ public:
    * \return true if successful
    */
   bool
-  convertCartesianDeltasToJointDeltas(std::vector<double> & delta_x_vec, const geometry_msgs::msg::TransformStamped & ik_base_to_tip_tf, std::vector<double> & delta_theta_vec);
+  convert_cartesian_deltas_to_joint_deltas(std::vector<double> & delta_x_vec, const geometry_msgs::msg::TransformStamped & ik_base_to_tip_tf, std::vector<double> & delta_theta_vec);
 
   /**
    * \brief Convert joint delta-theta to Cartesian delta-x, using the Jacobian.
@@ -52,7 +52,12 @@ public:
    * \return true if successful
    */
   bool
-  convertJointDeltasToCartesianDeltas(std::vector<double> &  delta_theta_vec, const geometry_msgs::msg::TransformStamped & ik_base_to_tip_tf, std::vector<double> & delta_x_vec);
+  convert_joint_deltas_to_cartesian_deltas(std::vector<double> &  delta_theta_vec, const geometry_msgs::msg::TransformStamped & ik_base_to_tip_tf, std::vector<double> & delta_x_vec);
+
+  void update_robot_state(const trajectory_msgs::msg::JointTrajectoryPoint & current_joint_state)
+  {
+    ;
+  }
 
 private:
   // MoveIt setup, required to retrieve the Jacobian
