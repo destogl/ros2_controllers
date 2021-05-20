@@ -217,8 +217,8 @@ controller_interface::return_type AdmittanceRule::update(
 )
 {
   // Convert inputs to control frame
-  // TODO(andyz): this causes unexpected rotation
-  //transform_message_to_control_frame(target_pose, target_pose_control_frame_);
+  // TODO(andyz): this causes wackiness
+//  transform_message_to_control_frame(target_pose, target_pose_control_frame_);
   target_pose_control_frame_ = target_pose;
 
   if (!hardware_state_has_offset_) {
@@ -233,7 +233,7 @@ controller_interface::return_type AdmittanceRule::update(
   std::array<double, 6> pose_error_vec;
 
   for (auto i = 0u; i < 6; ++i) {
-    pose_error_vec[i] = current_pose_control_frame_arr_[i] - target_pose_control_frame_arr_[i];
+    pose_error_vec[i] = target_pose_control_frame_arr_[i] - current_pose_control_frame_arr_[i];
     if (i >= 3) {
       pose_error_vec[i] = angles::normalize_angle(current_pose_control_frame_arr_[i]) -
       angles::normalize_angle(target_pose_control_frame_arr_[i]);
@@ -306,6 +306,15 @@ controller_interface::return_type AdmittanceRule::update(
     return controller_interface::return_type::ERROR;
   }
 
+  // Prevent numerical instability
+  for (double& cartesian_delta : target_ik_tip_deltas_vec)
+  {
+    if (std::fabs(cartesian_delta) < 1e-5)
+    {
+      cartesian_delta = 0;
+    }
+  }
+
   // Get the target pose
   geometry_msgs::msg::PoseStamped target_pose;
   target_pose.header.frame_id = ik_tip_frame_;
@@ -315,6 +324,7 @@ controller_interface::return_type AdmittanceRule::update(
 
   tf2::Quaternion q;
   q.setRPY(target_ik_tip_deltas_vec.at(3), target_ik_tip_deltas_vec.at(4), target_ik_tip_deltas_vec.at(5));
+  q.normalize();
   target_pose.pose.orientation.w = q.w();
   target_pose.pose.orientation.x = q.x();
   target_pose.pose.orientation.y = q.y();
