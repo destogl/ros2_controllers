@@ -216,10 +216,10 @@ controller_interface::return_type AdmittanceRule::update(
   trajectory_msgs::msg::JointTrajectoryPoint & desired_joint_state
 )
 {
-  // Convert inputs to control frame
-  // TODO(andyz): this causes wackiness
-//  transform_message_to_control_frame(target_pose, target_pose_control_frame_);
-  target_pose_control_frame_ = target_pose;
+  // Transform target pose to control frame
+  transform_message_to_control_frame(target_pose, target_pose_control_frame_);
+  RCLCPP_INFO_STREAM(rclcpp::get_logger("AdmittanceRule"), "target_pose_control_frame_(x): " << target_pose_control_frame_.pose.position.x);
+  RCLCPP_INFO_STREAM(rclcpp::get_logger("AdmittanceRule"), "target_pose_control_frame_(y): " << target_pose_control_frame_.pose.position.y);
 
   if (!hardware_state_has_offset_) {
     get_current_pose_of_endeffector_frame(current_pose_);
@@ -317,25 +317,27 @@ controller_interface::return_type AdmittanceRule::update(
 
   // Get the target pose
   geometry_msgs::msg::PoseStamped target_pose;
-  target_pose.header.frame_id = ik_tip_frame_;
-  target_pose.pose.position.x = target_ik_tip_deltas_vec.at(0);
-  target_pose.pose.position.y = target_ik_tip_deltas_vec.at(1);
-  target_pose.pose.position.z = target_ik_tip_deltas_vec.at(2);
+  target_pose.header.frame_id = ik_base_frame_;
+  target_pose.pose.position.x = transform_ik_base_tip.transform.translation.x;
+  target_pose.pose.position.y = transform_ik_base_tip.transform.translation.y;
+  target_pose.pose.position.z = transform_ik_base_tip.transform.translation.z;
+  target_pose.pose.position.x += target_ik_tip_deltas_vec.at(0);
+  RCLCPP_INFO_STREAM(rclcpp::get_logger("AdmittanceRule"), "current position (x): " << transform_ik_base_tip.transform.translation.x);
+  RCLCPP_INFO_STREAM(rclcpp::get_logger("AdmittanceRule"), "delta x: " << target_ik_tip_deltas_vec.at(0));
+  target_pose.pose.position.y += target_ik_tip_deltas_vec.at(1);
+  RCLCPP_INFO_STREAM(rclcpp::get_logger("AdmittanceRule"), "current position (y): " << transform_ik_base_tip.transform.translation.y);
+  RCLCPP_INFO_STREAM(rclcpp::get_logger("AdmittanceRule"), "delta y: " << target_ik_tip_deltas_vec.at(1));
+  target_pose.pose.position.z += target_ik_tip_deltas_vec.at(2);
 
-  tf2::Quaternion q;
-  q.setRPY(target_ik_tip_deltas_vec.at(3), target_ik_tip_deltas_vec.at(4), target_ik_tip_deltas_vec.at(5));
+  tf2::Quaternion q(transform_ik_base_tip.transform.rotation.x, transform_ik_base_tip.transform.rotation.y, transform_ik_base_tip.transform.rotation.z, transform_ik_base_tip.transform.rotation.w);
+  tf2::Quaternion q_rot;
+  q_rot.setRPY(target_ik_tip_deltas_vec.at(3), target_ik_tip_deltas_vec.at(4), target_ik_tip_deltas_vec.at(5));
+  q = q_rot * q;
   q.normalize();
-  target_pose.pose.orientation.w = q.w();
-  target_pose.pose.orientation.x = q.x();
-  target_pose.pose.orientation.y = q.y();
-  target_pose.pose.orientation.z = q.z();
-
-//   RCLCPP_INFO(rclcpp::get_logger("AdmittanceRule"),
-//               "IK-tip deltas: x: %e, y: %e, z: %e, rx: %e, ry: %e, rz: %e",
-//               target_ik_tip_deltas_vec.at(0), target_ik_tip_deltas_vec.at(1),
-//               target_ik_tip_deltas_vec.at(2), target_ik_tip_deltas_vec.at(3),
-//               target_ik_tip_deltas_vec.at(4), target_ik_tip_deltas_vec.at(5)
-//              );
+  target_pose.pose.orientation.w = 1; //q.w();
+  target_pose.pose.orientation.x = 0; //q.x();
+  target_pose.pose.orientation.y = 0; //q.y();
+  target_pose.pose.orientation.z = 0; //q.z();
 
   return update(current_joint_state, measured_wrench, target_pose, period, desired_joint_state);
 }
