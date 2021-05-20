@@ -120,12 +120,6 @@ protected:
     std::array<double, 6> & desired_relative_pose
   );
 
-  controller_interface::return_type calculate_desired_joint_state(
-    const trajectory_msgs::msg::JointTrajectoryPoint & current_joint_state,
-    const rclcpp::Duration & period,
-    trajectory_msgs::msg::JointTrajectoryPoint & desired_joint_state
-  );
-
   // IK variables
   std::shared_ptr<IncrementalKinematics> ik_;
 
@@ -156,7 +150,6 @@ protected:
   geometry_msgs::msg::WrenchStamped target_force_control_frame_;
   geometry_msgs::msg::PoseStamped target_pose_control_frame_;
 
-  geometry_msgs::msg::PoseStamped desired_pose_;
   geometry_msgs::msg::TransformStamped relative_desired_pose_;
 
   // Pre-reserved update-loop variables

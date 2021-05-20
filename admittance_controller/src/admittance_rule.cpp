@@ -225,10 +225,6 @@ controller_interface::return_type AdmittanceRule::update(
     get_current_pose_of_endeffector_frame(current_pose_);
     transform_message_to_control_frame(current_pose_, current_pose_control_frame_);
   }
-  // TODO(destogl): Can this work properly, when considering offset between states and commands?
-//   else {
-//     current_pose_control_frame_ = desired_pose_;
-//   }
 
   // Convert all data to arrays for simpler calculation
   convert_message_to_array(target_pose_control_frame_, target_pose_control_frame_arr_);
@@ -250,11 +246,6 @@ controller_interface::return_type AdmittanceRule::update(
 
   calculate_admittance_rule(measured_wrench_control_frame_arr_, pose_error_vec, period,
                             relative_desired_pose_arr_);
-
-  // Do clean conversion to the goal pose using transform and not messing with Euler angles
-  convert_array_to_message(relative_desired_pose_arr_, relative_desired_pose_);
-  tf2::doTransform(current_pose_control_frame_, desired_pose_, relative_desired_pose_);
-  transform_ik_tip_to_endeffector_frame(desired_pose_.pose, desired_pose_.pose);
 
   // Calculate desired Cartesian displacement of the robot
   // TODO: replace this with FK in the long term
@@ -282,12 +273,6 @@ controller_interface::return_type AdmittanceRule::update(
       std::fill(desired_joint_state.velocities.begin(), desired_joint_state.velocities.end(), 0.0);
       return controller_interface::return_type::ERROR;
     }
-
-  // TODO(anyone: enable this when enabling use of IK directly
-  // transform = tf_buffer_->lookupTransform(endeffector_frame_, ik_base_frame_, tf2::TimePointZero);
-  // tf2::doTransform(desired_pose_, ik_input_pose_, transform);
-  // ik_input_pose_.pose = transform_endeffector_to_ik_tip_frame(ik_input_pose_);
-  // std::vector<double> ik_sol = ik_solver_->getPositionIK (  ); ...
 
   return controller_interface::return_type::OK;
 }
@@ -380,7 +365,6 @@ controller_interface::return_type AdmittanceRule::get_controller_state(
 
   state_message.measured_wrench_endeffector_frame = measured_wrench_endeffector_frame_;
 
-  state_message.desired_pose = desired_pose_;
   state_message.relative_desired_pose = relative_desired_pose_;
 
   return controller_interface::return_type::OK;
@@ -500,53 +484,6 @@ void AdmittanceRule::calculate_admittance_rule(
       // RCLCPP_INFO(rclcpp::get_logger("AR"), "Pose error, acceleration, desired velocity, relative desired pose [%zu]: (%e - D*%e - S*%e = %e)", i, measured_wrench[i], desired_velocity_arr_[i], pose_error , acceleration);
     }
   }
-}
-
-controller_interface::return_type AdmittanceRule::calculate_desired_joint_state(
-  const trajectory_msgs::msg::JointTrajectoryPoint & current_joint_state,
-  const rclcpp::Duration & period,
-  trajectory_msgs::msg::JointTrajectoryPoint & desired_joint_state
-)
-{
-  // Do clean conversion to the goal pose using transform and not messing with Euler angles
-  convert_array_to_message(relative_desired_pose_arr_, relative_desired_pose_);
-  tf2::doTransform(current_pose_control_frame_, desired_pose_, relative_desired_pose_);
-  transform_ik_tip_to_endeffector_frame(desired_pose_.pose, desired_pose_.pose);
-
-  // Calculate desired Cartesian displacement of the robot
-  // TODO: replace this with FK in the long term
-  geometry_msgs::msg::TransformStamped transform;
-  try {
-    transform = tf_buffer_->lookupTransform(ik_base_frame_, ik_tip_frame_, tf2::TimePointZero);
-  } catch (const tf2::TransformException & e) {
-    // TODO(destogl): Use RCLCPP_ERROR_THROTTLE
-    RCLCPP_ERROR(rclcpp::get_logger("AdmittanceRule"), "LookupTransform failed between '" + ik_base_frame_ + "' and '" + ik_tip_frame_ + "'.");
-    return controller_interface::return_type::ERROR;
-  }
-
-  // Use Jacobian-based IK
-  std::vector<double> relative_desired_pose_vec(relative_desired_pose_arr_.begin(), relative_desired_pose_arr_.end());
-  if (ik_->convertCartesianDeltasToJointDeltas(
-    relative_desired_pose_vec, transform, relative_desired_joint_state_vec_)){
-    for (auto i = 0u; i < desired_joint_state.positions.size(); ++i) {
-      desired_joint_state.positions[i] = current_joint_state.positions[i] + relative_desired_joint_state_vec_[i];
-      desired_joint_state.velocities[i] = relative_desired_joint_state_vec_[i] / period.seconds();
-      //       RCLCPP_INFO(rclcpp::get_logger("AR"), "joint states [%zu]: %f + %f = %f", i, current_joint_state.positions[i], relative_desired_joint_state_vec_[i], desired_joint_state.positions[i]);
-    }
-    } else {
-      RCLCPP_ERROR(rclcpp::get_logger("AdmittanceRule"), "Conversion of Cartesian deltas to joint deltas failed. Sending current joint values to the robot.");
-      desired_joint_state = current_joint_state;
-      std::fill(desired_joint_state.velocities.begin(), desired_joint_state.velocities.end(), 0.0);
-      return controller_interface::return_type::ERROR;
-    }
-
-    // TODO(anyone: enable this when enabling use of IK directly
-    // transform = tf_buffer_->lookupTransform(endeffector_frame_, ik_base_frame_, tf2::TimePointZero);
-    // tf2::doTransform(desired_pose_, ik_input_pose_, transform);
-    // ik_input_pose_.pose = transform_endeffector_to_ik_tip_frame(ik_input_pose_);
-    // std::vector<double> ik_sol = ik_solver_->getPositionIK (  ); ...
-
-    return controller_interface::return_type::OK;
 }
 
 }  // namespace admittance_controller
