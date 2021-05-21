@@ -523,6 +523,7 @@ controller_interface::return_type AdmittanceController::update()
         joint_deltas[index] = angles::shortest_angular_distance(current_joint_states.positions[index], (*input_joint_cmd)->points[0].positions[index]);
       }
     }
+    RCLCPP_ERROR_STREAM(rclcpp::get_logger("AdmittanceRule"), "joint_deltas to update(): " << joint_deltas[0]);
     admittance_->update(current_joint_states, ft_values, joint_deltas, duration_since_last_call, desired_joint_states);
   } else {
     admittance_->update(current_joint_states, ft_values, **input_pose_cmd, duration_since_last_call, desired_joint_states);

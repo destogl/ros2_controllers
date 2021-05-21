@@ -337,6 +337,7 @@ controller_interface::return_type AdmittanceRule::update(
   q_rot.setRPY(target_ik_tip_deltas_vec.at(3), target_ik_tip_deltas_vec.at(4), target_ik_tip_deltas_vec.at(5));
   q = q_rot * q;
   q.normalize();
+  // TODO(andyz): disable orientations for testing
   target_pose.pose.orientation.w = 1; //q.w();
   target_pose.pose.orientation.x = 0; //q.x();
   target_pose.pose.orientation.y = 0; //q.y();
