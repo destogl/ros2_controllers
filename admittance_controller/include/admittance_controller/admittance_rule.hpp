@@ -151,8 +151,6 @@ protected:
   geometry_msgs::msg::WrenchStamped measured_wrench_control_frame_;
   geometry_msgs::msg::WrenchStamped measured_wrench_endeffector_frame_;
 
-  geometry_msgs::msg::PoseStamped origin_ik_tip_;
-  geometry_msgs::msg::PoseStamped origin_endeffector_;
   geometry_msgs::msg::PoseStamped current_pose_base_frame_;
   geometry_msgs::msg::PoseStamped current_pose_control_frame_;
 
