@@ -219,9 +219,6 @@ controller_interface::return_type AdmittanceRule::update(
   // Convert inputs to control frame
   transform_message_to_control_frame(target_pose, target_pose_control_frame_);
 
-  RCLCPP_ERROR_STREAM(rclcpp::get_logger("AdmittanceRule"), "target_pose frame: " << target_pose.header.frame_id);
-  RCLCPP_ERROR_STREAM(rclcpp::get_logger("AdmittanceRule"), "target_pose: " << target_pose.pose.position.x << "  " << target_pose.pose.position.y);
-
   if (!hardware_state_has_offset_) {
     get_pose_of_control_frame_in_base_frame(current_pose_base_frame_);
     transform_message_to_control_frame(current_pose_base_frame_, current_pose_control_frame_);
@@ -241,8 +238,7 @@ controller_interface::return_type AdmittanceRule::update(
     pose_error[i] = target_pose_control_frame_arr_[i] - current_pose_control_frame_arr_[i];
     RCLCPP_ERROR_STREAM(rclcpp::get_logger("AdmittanceRule"), "target_pose: " << target_pose_control_frame_arr_[i] << "  current_pose: " << current_pose_control_frame_arr_[i]);
     if (i >= 3) {
-      //pose_error[i] = angles::normalize_angle(target_pose_control_frame_arr_[i] - current_pose_control_frame_arr_[i]);
-      pose_error[i] = 0;
+      pose_error[i] = angles::normalize_angle(pose_error[i]);
     }
   }
 
