@@ -274,14 +274,13 @@ controller_interface::return_type AdmittanceRule::update(
   }
 
   // Add deltas to previously-desired pose to get the next desired pose
-  double motion_scale = 1.0;
-  feedforward_pose_ik_base_frame_.pose.position.x += motion_scale * target_ik_tip_deltas_vec.at(0);
-  feedforward_pose_ik_base_frame_.pose.position.y += motion_scale * target_ik_tip_deltas_vec.at(1);
-  feedforward_pose_ik_base_frame_.pose.position.z += motion_scale * target_ik_tip_deltas_vec.at(2);
+  feedforward_pose_ik_base_frame_.pose.position.x += target_ik_tip_deltas_vec.at(0);
+  feedforward_pose_ik_base_frame_.pose.position.y += target_ik_tip_deltas_vec.at(1);
+  feedforward_pose_ik_base_frame_.pose.position.z += target_ik_tip_deltas_vec.at(2);
 
   tf2::Quaternion q(feedforward_pose_ik_base_frame_.pose.orientation.x, feedforward_pose_ik_base_frame_.pose.orientation.y, feedforward_pose_ik_base_frame_.pose.orientation.z, feedforward_pose_ik_base_frame_.pose.orientation.w);
   tf2::Quaternion q_rot;
-  q_rot.setRPY(motion_scale * target_ik_tip_deltas_vec.at(3), motion_scale * target_ik_tip_deltas_vec.at(4), motion_scale * target_ik_tip_deltas_vec.at(5));
+  q_rot.setRPY(target_ik_tip_deltas_vec.at(3), target_ik_tip_deltas_vec.at(4), target_ik_tip_deltas_vec.at(5));
   q = q_rot * q;
   q.normalize();
   feedforward_pose_ik_base_frame_.pose.orientation.w = q.w();
