@@ -84,6 +84,7 @@ public:
   bool hardware_state_has_offset_ = false;
 
   // IK related parameters
+  // ik_base_frame should be stationary so vel/accel calculations are correct
   std::string ik_base_frame_;
   std::string ik_tip_frame_;
   std::string ik_group_name_;

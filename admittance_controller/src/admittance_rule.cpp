@@ -238,7 +238,6 @@ controller_interface::return_type AdmittanceRule::update(
     if (i >= 3) {
       pose_error[i] = angles::normalize_angle(pose_error[i]);
     }
-    RCLCPP_ERROR_STREAM(rclcpp::get_logger("AdmittanceRule"), pose_error[i]);
   }
 
   process_wrench_measurements(measured_wrench);
@@ -275,7 +274,7 @@ controller_interface::return_type AdmittanceRule::update(
   }
 
   // Add deltas to previously-desired pose to get the next desired pose
-  double motion_scale = 0.01;
+  double motion_scale = 1.0;
   feedforward_pose_ik_base_frame_.pose.position.x += motion_scale * target_ik_tip_deltas_vec.at(0);
   feedforward_pose_ik_base_frame_.pose.position.y += motion_scale * target_ik_tip_deltas_vec.at(1);
   feedforward_pose_ik_base_frame_.pose.position.z += motion_scale * target_ik_tip_deltas_vec.at(2);
