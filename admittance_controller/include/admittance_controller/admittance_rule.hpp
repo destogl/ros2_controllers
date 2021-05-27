@@ -154,6 +154,9 @@ protected:
   geometry_msgs::msg::PoseStamped current_pose_base_frame_;
   geometry_msgs::msg::PoseStamped current_pose_control_frame_;
 
+  // This is the feedforward pose. Where should the end effector be with no wrench applied?
+  geometry_msgs::msg::PoseStamped feedforward_pose_base_frame_;
+
   geometry_msgs::msg::WrenchStamped target_force_control_frame_;
   geometry_msgs::msg::PoseStamped target_pose_control_frame_;
 

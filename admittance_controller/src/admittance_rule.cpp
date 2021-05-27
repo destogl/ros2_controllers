@@ -173,6 +173,8 @@ controller_interface::return_type AdmittanceRule::configure(rclcpp::Node::Shared
   // Initialize IK
   ik_ = std::make_shared<IncrementalKinematics>(node, ik_group_name_);
 
+  reset();
+
   return controller_interface::return_type::OK;
 }
 
@@ -190,6 +192,7 @@ controller_interface::return_type AdmittanceRule::reset()
   desired_acceleration_previous_arr_.fill(0.0);
 
   get_pose_of_control_frame_in_base_frame(current_pose_base_frame_);
+  feedforward_pose_base_frame_ = current_pose_base_frame_;
 
   // Initialize ik_tip and tool_frame transformations - those are fixed transformations
   tf2::Stamped<tf2::Transform> tf2_transform;
@@ -274,32 +277,23 @@ controller_interface::return_type AdmittanceRule::update(
     return controller_interface::return_type::ERROR;
   }
 
-  // Get current robot pose
-  if (!hardware_state_has_offset_) {
-    get_pose_of_control_frame_in_base_frame(current_pose_base_frame_);
-  }
-  // TODO(destogl): Can this work properly, when considering offset between states and commands?
-//   else {
-//     current_pose_control_frame_ = desired_pose_control_frame_;
-//   }
+  // Add deltas to previously-desired pose to get the next desired pose
+  double motion_scale = 0.01;
+  feedforward_pose_base_frame_.pose.position.x += motion_scale * target_ik_tip_deltas_vec.at(0);
+  feedforward_pose_base_frame_.pose.position.y += motion_scale * target_ik_tip_deltas_vec.at(1);
+  feedforward_pose_base_frame_.pose.position.z += motion_scale * target_ik_tip_deltas_vec.at(2);
 
-  // Add deltas to current pose to get the desired pose
-  geometry_msgs::msg::PoseStamped target_pose_ik_base_frame = current_pose_base_frame_;
-  target_pose_ik_base_frame.pose.position.x += target_ik_tip_deltas_vec.at(0);
-  target_pose_ik_base_frame.pose.position.y += target_ik_tip_deltas_vec.at(1);
-  target_pose_ik_base_frame.pose.position.z += target_ik_tip_deltas_vec.at(2);
-
-  tf2::Quaternion q(target_pose_ik_base_frame.pose.orientation.x, target_pose_ik_base_frame.pose.orientation.y, target_pose_ik_base_frame.pose.orientation.z, target_pose_ik_base_frame.pose.orientation.w);
+  tf2::Quaternion q(feedforward_pose_base_frame_.pose.orientation.x, feedforward_pose_base_frame_.pose.orientation.y, feedforward_pose_base_frame_.pose.orientation.z, feedforward_pose_base_frame_.pose.orientation.w);
   tf2::Quaternion q_rot;
-  q_rot.setRPY(target_ik_tip_deltas_vec.at(3), target_ik_tip_deltas_vec.at(4), target_ik_tip_deltas_vec.at(5));
+  q_rot.setRPY(motion_scale * target_ik_tip_deltas_vec.at(3), motion_scale * target_ik_tip_deltas_vec.at(4), motion_scale * target_ik_tip_deltas_vec.at(5));
   q = q_rot * q;
   q.normalize();
-  target_pose_ik_base_frame.pose.orientation.w = q.w();
-  target_pose_ik_base_frame.pose.orientation.x = q.x();
-  target_pose_ik_base_frame.pose.orientation.y = q.y();
-  target_pose_ik_base_frame.pose.orientation.z = q.z();
+  feedforward_pose_base_frame_.pose.orientation.w = q.w();
+  feedforward_pose_base_frame_.pose.orientation.x = q.x();
+  feedforward_pose_base_frame_.pose.orientation.y = q.y();
+  feedforward_pose_base_frame_.pose.orientation.z = q.z();
 
-  return update(current_joint_state, measured_wrench, target_pose_ik_base_frame, period, desired_joint_state);
+  return update(current_joint_state, measured_wrench, feedforward_pose_base_frame_, period, desired_joint_state);
 }
 
 controller_interface::return_type AdmittanceRule::update(
