@@ -200,7 +200,8 @@ controller_interface::return_type AdmittanceRule::reset()
     control_frame_to_ik_tip_tf_ = tf2_transform.inverse();
   } catch (const tf2::TransformException & e) {
     // TODO(destogl): Use RCLCPP_ERROR_THROTTLE
-    RCLCPP_ERROR(rclcpp::get_logger("AdmittanceRule"), "LookupTransform failed between '" + ik_tip_frame_ + "' and '" + control_frame_ + "'.");
+    RCLCPP_ERROR(rclcpp::get_logger("AdmittanceRule"), "LookupTransform failed from '" +
+    control_frame_ + "' to '" + ik_tip_frame_ + "'.");
     return controller_interface::return_type::ERROR;
   }
 
@@ -331,7 +332,8 @@ controller_interface::return_type AdmittanceRule::get_controller_state(
     tf2::doTransform(measured_wrench_control_frame_, measured_wrench_endeffector_frame_, transform);
   } catch (const tf2::TransformException & e) {
     // TODO(destogl): Use RCLCPP_ERROR_THROTTLE
-    RCLCPP_ERROR(rclcpp::get_logger("AdmittanceRule"), "LookupTransform failed between '" + control_frame_ + "' and '" + endeffector_frame_ + "'.");
+    RCLCPP_ERROR(rclcpp::get_logger("AdmittanceRule"), "LookupTransform failed from '" +
+    control_frame_ + "' to '" + endeffector_frame_ + "'.");
   }
 
   state_message.measured_wrench_endeffector_frame = measured_wrench_endeffector_frame_;
@@ -355,7 +357,8 @@ controller_interface::return_type AdmittanceRule::get_pose_of_control_frame_in_b
     pose.pose.orientation= transform.transform.rotation;
   } catch (const tf2::TransformException & e) {
     // TODO(destogl): Use RCLCPP_ERROR_THROTTLE
-    RCLCPP_ERROR(rclcpp::get_logger("AdmittanceRule"), "LookupTransform failed between '" + ik_base_frame_ + "' and '" + control_frame_ + "'.");
+    RCLCPP_ERROR(rclcpp::get_logger("AdmittanceRule"), "LookupTransform failed from '" +
+    control_frame_ + "' to '" + ik_base_frame_ + "'.");
     return controller_interface::return_type::ERROR;
   }
   return controller_interface::return_type::OK;
@@ -372,11 +375,11 @@ void AdmittanceRule::process_wrench_measurements(
   // // get current states, and transform those into controller frame
   // measured_wrench_.wrench = measured_wrench;
   // try {
-  //   auto transform = tf_buffer_->lookupTransform(fixed_world_frame_,  measured_wrench_.header.frame_id, tf2::TimePointZero);
-  //   auto transform_back = tf_buffer_->lookupTransform(measured_wrench_.header.frame_id, fixed_world_frame_, tf2::TimePointZero);
+  //   auto transform_to_world = tf_buffer_->lookupTransform(fixed_world_frame_,  measured_wrench_.header.frame_id, tf2::TimePointZero);
+  //   auto transform_to_sensor = tf_buffer_->lookupTransform(measured_wrench_.header.frame_id, fixed_world_frame_, tf2::TimePointZero);
 
   //   geometry_msgs::msg::WrenchStamped measured_wrench_transformed;
-  //   tf2::doTransform(measured_wrench_, measured_wrench_transformed, transform);
+  //   tf2::doTransform(measured_wrench_, measured_wrench_transformed, transform_to_world);
 
   //   geometry_msgs::msg::Vector3Stamped cog_transformed;
   //   for (const auto & params : gravity_compensation_params_) {
@@ -388,10 +391,8 @@ void AdmittanceRule::process_wrench_measurements(
   //     measured_wrench_transformed.wrench.torque.y -= (params.force_ * cog_transformed.vector.x);
   //   }
 
-  //   tf2::doTransform(measured_wrench_transformed, measured_wrench_filtered_, transform_back);
+  //   tf2::doTransform(measured_wrench_transformed, measured_wrench_filtered_, transform_to_sensor);
 
-  //   RCLCPP_ERROR_STREAM(rclcpp::get_logger("AdmittanceRule"), transform.transform.translation.y);
-  //   RCLCPP_ERROR_STREAM(rclcpp::get_logger("AdmittanceRule"), transform.transform.translation.z);
   // } catch (const tf2::TransformException & e) {
   //   // TODO(destogl): Use RCLCPP_ERROR_THROTTLE
   //   RCLCPP_ERROR(rclcpp::get_logger("AdmittanceRule"), "LookupTransform failed between '" + fixed_world_frame_ + "' and '" + measured_wrench_.header.frame_id + "' or '<a cog frame>'.");
@@ -430,8 +431,12 @@ void AdmittanceRule::calculate_admittance_rule(
       desired_acceleration_previous_arr_[i] = acceleration;
       desired_velocity_previous_arr_[i] = desired_velocity_arr_[i];
 
-//       RCLCPP_INFO(rclcpp::get_logger("AR"), "%e = %e - (1/M(%.1f)) (%e - D(%.1f)*%e - S(%.1f)*%e)",
-//                   acceleration, feedforward_acceleration[i], mass_[i], measured_wrench[i], damping_[i], desired_velocity_arr_[i], stiffness_[i], pose_error[i]);
+//       RCLCPP_INFO(rclcpp::get_logger("AR"), "Adm. Rule [%zu]: (%e = %e - D(%.1f)*%e - S(%.1f)*%e)", i,
+//                   acceleration, measured_wrench[i], damping_[i], desired_velocity_arr_[i],
+//                   stiffness_[i], pose_error[i]);
+
+//       RCLCPP_INFO(rclcpp::get_logger("AR"), "Adm. acc [%zu]: %e = %e - (1/M(%.1f)) (%e - D(%.1f)*%e - S(%.1f)*%e)",
+//                   i, acceleration, feedforward_acceleration[i], mass_[i], measured_wrench[i], damping_[i], desired_velocity_arr_[i], stiffness_[i], pose_error[i]);
     }
   }
 }

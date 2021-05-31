@@ -198,7 +198,8 @@ private:
         tf2::doTransform(message_in, message_out, transform);
       } catch (const tf2::TransformException & e) {
         // TODO(destogl): Use RCLCPP_ERROR_THROTTLE
-        RCLCPP_ERROR(rclcpp::get_logger("AdmittanceRule"), "LookupTransform failed between '" + ik_base_frame_ + "' and '" + message_in.header.frame_id + "'.");
+        RCLCPP_ERROR(rclcpp::get_logger("AdmittanceRule"), "LookupTransform failed from '" +
+        message_in.header.frame_id + "' to '" + ik_base_frame_ + "'.");
         return controller_interface::return_type::ERROR;
       }
     } else {

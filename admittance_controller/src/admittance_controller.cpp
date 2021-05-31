@@ -530,7 +530,6 @@ controller_interface::return_type AdmittanceController::update()
 //   } else {
 
   // TODO(destogl): refactor this into different admittance controllers: 1. Pose input, Joint State input and Unified mode (is there need for switching between unified and non-unified mode?)
-  // TODO(andyz): this should be optional
   if (use_joint_commands_as_input_) {
     std::array<double, 6> joint_deltas;
     // If there are no positions, expect velocities
