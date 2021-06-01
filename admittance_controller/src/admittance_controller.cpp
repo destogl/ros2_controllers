@@ -583,10 +583,10 @@ void AdmittanceController::read_state_from_hardware(
 {
   const auto num_joints = joint_names_.size();
   auto assign_point_from_interface = [&, num_joints](
-    std::vector<double> & trajectory_point_interface, const auto & joint_inteface)
+    std::vector<double> & trajectory_point_interface, const auto & joint_interface)
   {
     for (auto index = 0ul; index < num_joints; ++index) {
-      trajectory_point_interface[index] = joint_inteface[index].get().get_value();
+      trajectory_point_interface[index] = joint_interface[index].get().get_value();
     }
   };
 
@@ -620,10 +620,10 @@ bool AdmittanceController::read_state_from_command_interfaces(
   trajectory_msgs::msg::JointTrajectoryPoint state = output_state;
 
   auto assign_point_from_interface = [&, num_joints](
-    std::vector<double> & trajectory_point_interface, const auto & joint_inteface)
+    std::vector<double> & trajectory_point_interface, const auto & joint_interface)
     {
       for (auto index = 0ul; index < num_joints; ++index) {
-        trajectory_point_interface[index] = joint_inteface[index].get().get_value();
+        trajectory_point_interface[index] = joint_interface[index].get().get_value();
       }
     };
 
@@ -647,6 +647,9 @@ bool AdmittanceController::read_state_from_command_interfaces(
   if (has_velocity_state_interface_) {
     if (has_velocity_command_interface_ && interface_has_values(joint_command_interface_[1])) {
       assign_point_from_interface(state.velocities, joint_command_interface_[1]);
+      //TODO(destogl): enable this line under to be sure if positions are not existing and velocities
+      // are existing to still update the output_state; !commented because not tested!
+//       has_values = true;
     } else {
       state.velocities.clear();
       has_values = false;

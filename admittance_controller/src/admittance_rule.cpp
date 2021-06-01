@@ -191,6 +191,8 @@ controller_interface::return_type AdmittanceRule::reset()
   get_pose_of_control_frame_in_base_frame(current_pose_ik_base_frame_);
   feedforward_pose_ik_base_frame_ = current_pose_ik_base_frame_;
 
+  // "Open-loop" controller uses old desired pose as current pose: current_pose(K) = desired_pose(K-1)
+  // Therefore desired pose has to be set before calling *update*-method
   if (open_loop_control_) {
     get_pose_of_control_frame_in_base_frame(desired_pose_ik_base_frame_);
   }
@@ -221,11 +223,9 @@ controller_interface::return_type AdmittanceRule::update(
   trajectory_msgs::msg::JointTrajectoryPoint & desired_joint_state
 )
 {
-  // FIXME: What if there is open loop control used? Will this work?
   // Convert inputs to ik_base frame (assumed stationary)
   transform_message_to_ik_base_frame(target_pose, target_pose_ik_base_frame_);
 
-  // TODO(andyz): what if there is a hardware offset?
   if (!open_loop_control_) {
     get_pose_of_control_frame_in_base_frame(current_pose_ik_base_frame_);
   } else {
