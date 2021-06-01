@@ -191,6 +191,10 @@ controller_interface::return_type AdmittanceRule::reset()
   get_pose_of_control_frame_in_base_frame(current_pose_ik_base_frame_);
   feedforward_pose_ik_base_frame_ = current_pose_ik_base_frame_;
 
+  if (open_loop_control_) {
+    get_pose_of_control_frame_in_base_frame(desired_pose_ik_base_frame_);
+  }
+
   // Initialize ik_tip and tool_frame transformations - those are fixed transformations
   tf2::Stamped<tf2::Transform> tf2_transform;
   try {
@@ -217,12 +221,15 @@ controller_interface::return_type AdmittanceRule::update(
   trajectory_msgs::msg::JointTrajectoryPoint & desired_joint_state
 )
 {
+  // FIXME: What if there is open loop control used? Will this work?
   // Convert inputs to ik_base frame (assumed stationary)
   transform_message_to_ik_base_frame(target_pose, target_pose_ik_base_frame_);
 
   // TODO(andyz): what if there is a hardware offset?
   if (!open_loop_control_) {
     get_pose_of_control_frame_in_base_frame(current_pose_ik_base_frame_);
+  } else {
+    current_pose_ik_base_frame_ = desired_pose_ik_base_frame_;
   }
 
   // Convert all data to arrays for simpler calculation
@@ -249,6 +256,7 @@ controller_interface::return_type AdmittanceRule::update(
   calculate_admittance_rule(measured_wrench_control_frame_arr_, pose_error, feedforward_acceleration, period,
                             relative_desired_pose_arr_);
 
+  // This works in all cases because not current TF data are used
   // Do clean conversion to the goal pose using transform and not messing with Euler angles
   convert_array_to_message(relative_desired_pose_arr_, relative_desired_pose_);
   tf2::doTransform(current_pose_ik_base_frame_, desired_pose_ik_base_frame_, relative_desired_pose_);
@@ -271,9 +279,12 @@ controller_interface::return_type AdmittanceRule::update(
   // Since ik_base is MoveIt's working frame, the transform is identity.
   identity_transform_.header.frame_id = ik_base_frame_;
   ik_->update_robot_state(current_joint_state);
+  // FIXME: Do we need if here? Can we simply use if (!ik_->...)?
   if (ik_->convertJointDeltasToCartesianDeltas(target_joint_deltas_vec, identity_transform_, target_ik_tip_deltas_vec)) {
   } else {
-    RCLCPP_ERROR(rclcpp::get_logger("AdmittanceRule"), "Conversion of joint deltas to Cartesian deltas failed. Sending current joint values to the robot.");
+    RCLCPP_ERROR(rclcpp::get_logger("AdmittanceRule"),
+                 "Conversion of joint deltas to Cartesian deltas failed. Sending current joint"
+                 " values to the robot.");
     desired_joint_state = current_joint_state;
     std::fill(desired_joint_state.velocities.begin(), desired_joint_state.velocities.end(), 0.0);
     return controller_interface::return_type::ERROR;
@@ -284,7 +295,8 @@ controller_interface::return_type AdmittanceRule::update(
   }
 
   // Add deltas to previously-desired pose to get the next desired pose
-  // TODO: Use convert_to_array method
+  // FIXME: Why not use convert_to_array method?
+  // FIXME: (?) Does this variable have a wrong name? Shouldn't it be target_pose_ik_base_frame?
   feedforward_pose_ik_base_frame_.pose.position.x += target_ik_tip_deltas_vec.at(0);
   feedforward_pose_ik_base_frame_.pose.position.y += target_ik_tip_deltas_vec.at(1);
   feedforward_pose_ik_base_frame_.pose.position.z += target_ik_tip_deltas_vec.at(2);
