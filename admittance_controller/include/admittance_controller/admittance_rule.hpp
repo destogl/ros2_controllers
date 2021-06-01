@@ -186,6 +186,12 @@ protected:
 
   std::vector<double> relative_desired_joint_state_vec_;
 
+  // TODO(destogl): find out better datatype for this
+  // Values calculated by admittance rule (Cartesian space: [x, y, z, rx, ry, rz]) - state output
+  // "positions" hold "pose_error" values
+  // "effort" hold "measured_wrench" values
+  trajectory_msgs::msg::JointTrajectoryPoint admittance_rule_calculated_values_;
+
 private:
   template<typename MsgType>
   controller_interface::return_type

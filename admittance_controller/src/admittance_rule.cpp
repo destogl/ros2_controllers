@@ -172,6 +172,11 @@ controller_interface::return_type AdmittanceRule::configure(rclcpp::Node::Shared
 
   relative_desired_joint_state_vec_.reserve(6);
 
+  admittance_rule_calculated_values_.positions.resize(6, 0.0);
+  admittance_rule_calculated_values_.velocities.resize(6, 0.0);
+  admittance_rule_calculated_values_.accelerations.resize(6, 0.0);
+  admittance_rule_calculated_values_.effort.resize(6, 0.0);
+
   // Initialize IK
   ik_ = std::make_shared<IncrementalKinematics>(node, ik_group_name_);
 
@@ -347,8 +352,9 @@ controller_interface::return_type AdmittanceRule::get_controller_state(
     RCLCPP_ERROR(rclcpp::get_logger("AdmittanceRule"), "LookupTransform failed from '" +
     control_frame_ + "' to '" + endeffector_frame_ + "'.");
   }
-
   state_message.measured_wrench_endeffector_frame = measured_wrench_endeffector_frame_;
+
+  state_message.admittance_rule_calculated_values = admittance_rule_calculated_values_;
 
   state_message.current_pose = current_pose_ik_base_frame_;
   state_message.desired_pose = desired_pose_ik_base_frame_;
@@ -443,12 +449,10 @@ void AdmittanceRule::calculate_admittance_rule(
       desired_acceleration_previous_arr_[i] = acceleration;
       desired_velocity_previous_arr_[i] = desired_velocity_arr_[i];
 
-//       RCLCPP_INFO(rclcpp::get_logger("AR"), "Adm. Rule [%zu]: (%e = %e - D(%.1f)*%e - S(%.1f)*%e)", i,
-//                   acceleration, measured_wrench[i], damping_[i], desired_velocity_arr_[i],
-//                   stiffness_[i], pose_error[i]);
-
-//       RCLCPP_INFO(rclcpp::get_logger("AR"), "Adm. acc [%zu]: %e = %e - (1/M(%.1f)) (%e - D(%.1f)*%e - S(%.1f)*%e)",
-//                   i, acceleration, feedforward_acceleration[i], mass_[i], measured_wrench[i], damping_[i], desired_velocity_arr_[i], stiffness_[i], pose_error[i]);
+      admittance_rule_calculated_values_.positions[i] = pose_error[i];
+      admittance_rule_calculated_values_.velocities[i] = desired_velocity_arr_[i];
+      admittance_rule_calculated_values_.accelerations[i] = acceleration;
+      admittance_rule_calculated_values_.effort[i] = measured_wrench[i];
     }
   }
 }
