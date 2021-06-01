@@ -273,14 +273,14 @@ controller_interface::return_type AdmittanceRule::update(
   trajectory_msgs::msg::JointTrajectoryPoint & desired_joint_state)
 {
   std::vector<double> target_joint_deltas_vec(target_joint_deltas.begin(), target_joint_deltas.end());
-  std::vector<double> target_ik_tip_deltas_vec(6);
+  std::vector<double> target_deltas_vec_ik_base(6);
 
   // Get feed-forward cartesian deltas in the ik_base frame.
   // Since ik_base is MoveIt's working frame, the transform is identity.
   identity_transform_.header.frame_id = ik_base_frame_;
   ik_->update_robot_state(current_joint_state);
   // FIXME: Do we need if here? Can we simply use if (!ik_->...)?
-  if (ik_->convertJointDeltasToCartesianDeltas(target_joint_deltas_vec, identity_transform_, target_ik_tip_deltas_vec)) {
+  if (ik_->convertJointDeltasToCartesianDeltas(target_joint_deltas_vec, identity_transform_, target_deltas_vec_ik_base)) {
   } else {
     RCLCPP_ERROR(rclcpp::get_logger("AdmittanceRule"),
                  "Conversion of joint deltas to Cartesian deltas failed. Sending current joint"
@@ -291,19 +291,19 @@ controller_interface::return_type AdmittanceRule::update(
   }
 
   for (auto i = 0u; i < 6; ++i) {
-    feedforward_velocity_ik_base_frame_[i] = target_ik_tip_deltas_vec.at(i) / period.seconds();
+    feedforward_velocity_ik_base_frame_[i] = target_deltas_vec_ik_base.at(i) / period.seconds();
   }
 
   // Add deltas to previously-desired pose to get the next desired pose
   // FIXME: Why not use convert_to_array method?
   // FIXME: (?) Does this variable have a wrong name? Shouldn't it be target_pose_ik_base_frame?
-  feedforward_pose_ik_base_frame_.pose.position.x += target_ik_tip_deltas_vec.at(0);
-  feedforward_pose_ik_base_frame_.pose.position.y += target_ik_tip_deltas_vec.at(1);
-  feedforward_pose_ik_base_frame_.pose.position.z += target_ik_tip_deltas_vec.at(2);
+  feedforward_pose_ik_base_frame_.pose.position.x += target_deltas_vec_ik_base.at(0);
+  feedforward_pose_ik_base_frame_.pose.position.y += target_deltas_vec_ik_base.at(1);
+  feedforward_pose_ik_base_frame_.pose.position.z += target_deltas_vec_ik_base.at(2);
 
   tf2::Quaternion q(feedforward_pose_ik_base_frame_.pose.orientation.x, feedforward_pose_ik_base_frame_.pose.orientation.y, feedforward_pose_ik_base_frame_.pose.orientation.z, feedforward_pose_ik_base_frame_.pose.orientation.w);
   tf2::Quaternion q_rot;
-  q_rot.setRPY(target_ik_tip_deltas_vec.at(3), target_ik_tip_deltas_vec.at(4), target_ik_tip_deltas_vec.at(5));
+  q_rot.setRPY(target_deltas_vec_ik_base.at(3), target_deltas_vec_ik_base.at(4), target_deltas_vec_ik_base.at(5));
   q = q_rot * q;
   q.normalize();
   feedforward_pose_ik_base_frame_.pose.orientation.w = q.w();
