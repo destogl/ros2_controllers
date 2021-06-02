@@ -188,7 +188,6 @@ controller_interface::return_type AdmittanceRule::reset()
   measured_wrench_control_frame_arr_.fill(0.0);
   target_pose_ik_base_frame_arr_.fill(0.0);
   current_pose_ik_base_frame_arr_.fill(0.0);
-  angles_error_.fill(0.0);
   desired_velocity_arr_.fill(0.0);
   desired_velocity_previous_arr_.fill(0.0);
   desired_acceleration_previous_arr_.fill(0.0);
@@ -200,20 +199,6 @@ controller_interface::return_type AdmittanceRule::reset()
   // Therefore desired pose has to be set before calling *update*-method
   if (open_loop_control_) {
     get_pose_of_control_frame_in_base_frame(feedforward_pose_ik_base_frame_);
-  }
-
-  // Initialize ik_tip and tool_frame transformations - those are fixed transformations
-  tf2::Stamped<tf2::Transform> tf2_transform;
-  try {
-    auto transform = tf_buffer_->lookupTransform(ik_tip_frame_, control_frame_, tf2::TimePointZero);
-    tf2::fromMsg(transform, tf2_transform);
-    ik_tip_to_control_frame_tf_ = tf2_transform;
-    control_frame_to_ik_tip_tf_ = tf2_transform.inverse();
-  } catch (const tf2::TransformException & e) {
-    // TODO(destogl): Use RCLCPP_ERROR_THROTTLE
-    RCLCPP_ERROR(rclcpp::get_logger("AdmittanceRule"), "LookupTransform failed from '" +
-    control_frame_ + "' to '" + ik_tip_frame_ + "'.");
-    return controller_interface::return_type::ERROR;
   }
 
   return controller_interface::return_type::OK;
@@ -465,11 +450,10 @@ controller_interface::return_type AdmittanceRule::calculate_desired_joint_state(
   std::vector<double> relative_desired_pose_vec(relative_desired_pose_arr_.begin(), relative_desired_pose_arr_.end());
   if (ik_->convertCartesianDeltasToJointDeltas(
     relative_desired_pose_vec, identity_transform_, relative_desired_joint_state_vec_)){
-    for (auto i = 0u; i < desired_joint_state.positions.size(); ++i) {
-      desired_joint_state.positions[i] = current_joint_state.positions[i] + relative_desired_joint_state_vec_[i];
-      desired_joint_state.velocities[i] = relative_desired_joint_state_vec_[i] / period.seconds();
-      //       RCLCPP_INFO(rclcpp::get_logger("AR"), "joint states [%zu]: %f + %f = %f", i, current_joint_state.positions[i], relative_desired_joint_state_vec_[i], desired_joint_state.positions[i]);
-    }
+      for (auto i = 0u; i < desired_joint_state.positions.size(); ++i) {
+        desired_joint_state.positions[i] = current_joint_state.positions[i] + relative_desired_joint_state_vec_[i];
+        desired_joint_state.velocities[i] = relative_desired_joint_state_vec_[i] / period.seconds();
+      }
     } else {
       RCLCPP_ERROR(rclcpp::get_logger("AdmittanceRule"), "Conversion of Cartesian deltas to joint deltas failed. Sending current joint values to the robot.");
       desired_joint_state = current_joint_state;
