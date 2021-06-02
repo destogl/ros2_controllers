@@ -437,13 +437,18 @@ void AdmittanceRule::calculate_admittance_rule(
   for (auto i = 0u; i < 6; ++i) {
     if (selected_axes_[i]) {
       // TODO(destogl): check if velocity is measured from hardware
-      const double acceleration = feedforward_acceleration[i] + (1 / mass_[i]) *
-      (measured_wrench[i] - damping_[i] * desired_velocity_arr_[i] - stiffness_[i] * pose_error[i]);
 
+      // Admittance contribution is summed with the feedforward acceleration
+      const double admittance_acceleration = (1 / mass_[i]) * (measured_wrench[i] - damping_[i] * admittance_velocity_arr_[i] - stiffness_[i] * pose_error[i]);
+      const double acceleration = feedforward_acceleration[i] + admittance_acceleration;
+
+      // Admittance vel/accel component
+      admittance_velocity_arr_[i] += (admittance_acceleration_previous_arr_[i] + admittance_acceleration) * 0.5 * period.seconds();
+      admittance_acceleration_previous_arr_[i] = admittance_acceleration;
+
+      // Net vel/accel
       desired_velocity_arr_[i] += (desired_acceleration_previous_arr_[i] + acceleration) * 0.5 * period.seconds();
-
       desired_relative_pose[i] = (desired_velocity_previous_arr_[i] + desired_velocity_arr_[i]) * 0.5 * period.seconds();
-
       desired_acceleration_previous_arr_[i] = acceleration;
       desired_velocity_previous_arr_[i] = desired_velocity_arr_[i];
 
