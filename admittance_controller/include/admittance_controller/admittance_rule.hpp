@@ -168,8 +168,6 @@ protected:
 
   geometry_msgs::msg::WrenchStamped target_force_ik_base_frame_;
   geometry_msgs::msg::PoseStamped target_pose_ik_base_frame_;
-
-  geometry_msgs::msg::PoseStamped desired_pose_ik_base_frame_;
   geometry_msgs::msg::TransformStamped relative_desired_pose_;
 
   // Pre-reserved update-loop variables

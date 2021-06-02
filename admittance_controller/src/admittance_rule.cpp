@@ -199,7 +199,7 @@ controller_interface::return_type AdmittanceRule::reset()
   // "Open-loop" controller uses old desired pose as current pose: current_pose(K) = desired_pose(K-1)
   // Therefore desired pose has to be set before calling *update*-method
   if (open_loop_control_) {
-    get_pose_of_control_frame_in_base_frame(desired_pose_ik_base_frame_);
+    get_pose_of_control_frame_in_base_frame(feedforward_pose_ik_base_frame_);
   }
 
   // Initialize ik_tip and tool_frame transformations - those are fixed transformations
@@ -231,11 +231,7 @@ controller_interface::return_type AdmittanceRule::update(
   // Convert inputs to ik_base frame (assumed stationary)
   transform_message_to_ik_base_frame(target_pose, target_pose_ik_base_frame_);
 
-  if (!open_loop_control_) {
-    get_pose_of_control_frame_in_base_frame(current_pose_ik_base_frame_);
-  } else {
-    current_pose_ik_base_frame_ = desired_pose_ik_base_frame_;
-  }
+  get_pose_of_control_frame_in_base_frame(current_pose_ik_base_frame_);
 
   // Convert all data to arrays for simpler calculation
   convert_message_to_array(target_pose_ik_base_frame_, target_pose_ik_base_frame_arr_);
@@ -250,7 +246,6 @@ controller_interface::return_type AdmittanceRule::update(
     if (i >= 3) {
       pose_error[i] = angles::normalize_angle(pose_error[i]);
     }
-
     // Estimate feedforward acceleration
     feedforward_acceleration[i] = (feedforward_velocity_ik_base_frame_[i] - prev_feedforward_velocity_ik_base_frame_[i]) / period.seconds();
   }
@@ -264,7 +259,6 @@ controller_interface::return_type AdmittanceRule::update(
   // This works in all cases because not current TF data are used
   // Do clean conversion to the goal pose using transform and not messing with Euler angles
   convert_array_to_message(relative_desired_pose_arr_, relative_desired_pose_);
-  tf2::doTransform(current_pose_ik_base_frame_, desired_pose_ik_base_frame_, relative_desired_pose_);
 
   return calculate_desired_joint_state(current_joint_state, period, desired_joint_state);
 }
@@ -301,7 +295,6 @@ controller_interface::return_type AdmittanceRule::update(
 
   // Add deltas to previously-desired pose to get the next desired pose
   // FIXME: Why not use convert_to_array method?
-  // FIXME: (?) Does this variable have a wrong name? Shouldn't it be target_pose_ik_base_frame?
   feedforward_pose_ik_base_frame_.pose.position.x += target_deltas_vec_ik_base.at(0);
   feedforward_pose_ik_base_frame_.pose.position.y += target_deltas_vec_ik_base.at(1);
   feedforward_pose_ik_base_frame_.pose.position.z += target_deltas_vec_ik_base.at(2);
@@ -357,7 +350,7 @@ controller_interface::return_type AdmittanceRule::get_controller_state(
   state_message.admittance_rule_calculated_values = admittance_rule_calculated_values_;
 
   state_message.current_pose = current_pose_ik_base_frame_;
-  state_message.desired_pose = desired_pose_ik_base_frame_;
+  state_message.desired_pose = feedforward_pose_ik_base_frame_;
   state_message.relative_desired_pose = relative_desired_pose_;
 
   return controller_interface::return_type::OK;
