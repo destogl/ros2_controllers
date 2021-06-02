@@ -231,6 +231,8 @@ controller_interface::return_type AdmittanceRule::update(
   // Convert inputs to ik_base frame (assumed stationary)
   transform_message_to_ik_base_frame(target_pose, target_pose_ik_base_frame_);
 
+  // In open-loop mode, we can't get the current pose from tf. Trust that the previous target
+  // pose was reached.
   if (!open_loop_control_) {
     get_pose_of_control_frame_in_base_frame(current_pose_ik_base_frame_);
   } else {
