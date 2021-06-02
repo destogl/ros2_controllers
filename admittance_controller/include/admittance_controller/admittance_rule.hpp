@@ -178,6 +178,10 @@ protected:
 
   std::array<double, 3> angles_error_;
 
+  // Admittance vel/accel components are summed with the desired, feedforward acceleration
+  std::array<double, 6> admittance_velocity_arr_;
+  std::array<double, 6> admittance_acceleration_previous_arr_;
+
   std::array<double, 6> relative_desired_pose_arr_;
   std::array<double, 6> desired_velocity_arr_;
   std::array<double, 6> desired_velocity_previous_arr_;
