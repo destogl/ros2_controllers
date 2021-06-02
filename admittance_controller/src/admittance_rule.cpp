@@ -231,7 +231,11 @@ controller_interface::return_type AdmittanceRule::update(
   // Convert inputs to ik_base frame (assumed stationary)
   transform_message_to_ik_base_frame(target_pose, target_pose_ik_base_frame_);
 
-  get_pose_of_control_frame_in_base_frame(current_pose_ik_base_frame_);
+  if (!open_loop_control_) {
+    get_pose_of_control_frame_in_base_frame(current_pose_ik_base_frame_);
+  } else {
+    current_pose_ik_base_frame_ = prev_target_pose_ik_base_frame_;
+  }
 
   // Convert all data to arrays for simpler calculation
   convert_message_to_array(target_pose_ik_base_frame_, target_pose_ik_base_frame_arr_);
@@ -249,6 +253,7 @@ controller_interface::return_type AdmittanceRule::update(
     // Estimate feedforward acceleration
     feedforward_acceleration[i] = (feedforward_velocity_ik_base_frame_[i] - prev_feedforward_velocity_ik_base_frame_[i]) / period.seconds();
   }
+  prev_target_pose_ik_base_frame_ = target_pose_ik_base_frame_;
   prev_feedforward_velocity_ik_base_frame_ = feedforward_velocity_ik_base_frame_;
 
   process_wrench_measurements(measured_wrench);
