@@ -235,7 +235,19 @@ controller_interface::return_type AdmittanceRule::update(
   if (!open_loop_control_) {
     get_pose_of_control_frame_in_base_frame(current_pose_ik_base_frame_);
   } else {
-    current_pose_ik_base_frame_ = prev_target_pose_ik_base_frame_;
+    Eigen::Isometry3d control_frame_pose = ik_->get_link_transform(control_frame_);
+
+    // TODO(andyz): use a convenience function for this
+    current_pose_ik_base_frame_.header.frame_id = ik_base_frame_;
+    current_pose_ik_base_frame_.pose.position.x = control_frame_pose.translation().x();
+    current_pose_ik_base_frame_.pose.position.x = control_frame_pose.translation().y();
+    current_pose_ik_base_frame_.pose.position.x = control_frame_pose.translation().z();
+
+    Eigen::Quaterniond quat(control_frame_pose.rotation());
+    current_pose_ik_base_frame_.pose.orientation.w = quat.w();
+    current_pose_ik_base_frame_.pose.orientation.x = quat.x();
+    current_pose_ik_base_frame_.pose.orientation.y = quat.y();
+    current_pose_ik_base_frame_.pose.orientation.z = quat.z();
   }
 
   // Convert all data to arrays for simpler calculation
