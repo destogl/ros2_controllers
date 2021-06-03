@@ -195,6 +195,7 @@ controller_interface::return_type AdmittanceRule::reset()
 
   get_pose_of_control_frame_in_base_frame(current_pose_ik_base_frame_);
   feedforward_pose_ik_base_frame_ = current_pose_ik_base_frame_;
+  prev_target_pose_ik_base_frame_ = current_pose_ik_base_frame_;
 
   // "Open-loop" controller uses old desired pose as current pose: current_pose(K) = desired_pose(K-1)
   // Therefore desired pose has to be set before calling *update*-method
