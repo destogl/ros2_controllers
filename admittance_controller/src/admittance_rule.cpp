@@ -30,6 +30,10 @@
 
 namespace {  // Utility namespace
 
+// TODO(andyz): parameterize deadband vel/accel
+// This is a generic numerical accuracy check for all unit types (rad, rad/s, rad/s^2)
+static constexpr double DEADBAND_EPSILON = 1e-5;
+
 template<typename Type>
 void convert_message_to_array(const geometry_msgs::msg::Pose & msg, Type & vector_out)
 {
@@ -264,11 +268,23 @@ controller_interface::return_type AdmittanceRule::update(
   calculate_admittance_rule(measured_wrench_control_frame_arr_, pose_error, feedforward_acceleration, period,
                             relative_desired_pose_arr_);
 
-  // This works in all cases because not current TF data are used
-  // Do clean conversion to the goal pose using transform and not messing with Euler angles
-  convert_array_to_message(relative_desired_pose_arr_, relative_desired_pose_);
+  // Deadband: if the net motion would be very small, simple pass the current joints through without change.
+  // This prevents a slow drift.
+  double sum_of_relative_desired_pose = std::accumulate(relative_desired_pose_arr_.begin(), relative_desired_pose_arr_.end(), sum_of_relative_desired_pose);
+  if (std::fabs(sum_of_relative_desired_pose) < DEADBAND_EPSILON)
+  {
+    desired_joint_state = current_joint_state;
+  }
+  else
+  {
+    // This works in all cases because not current TF data are used
+    // Do clean conversion to the goal pose using transform and not messing with Euler angles
+    convert_array_to_message(relative_desired_pose_arr_, relative_desired_pose_);
+    // Use the Jacobian to transform a Cartesian change to joint angle change
+    return calculate_desired_joint_state(current_joint_state, period, desired_joint_state);
+  }
 
-  return calculate_desired_joint_state(current_joint_state, period, desired_joint_state);
+  return controller_interface::return_type::OK;
 }
 
 // Update from target joint deltas
@@ -445,8 +461,7 @@ void AdmittanceRule::calculate_admittance_rule(
       double admittance_acceleration = (1 / mass_[i]) * (measured_wrench[i] - damping_[i] * admittance_velocity_arr_[i] - stiffness_[i] * pose_error[i]);
 
       // A deadband for admittance control
-      // TODO(andyz): parameterize deadband vel/accel
-      if (admittance_acceleration < 1e-4 && admittance_velocity_arr_[i] < 1e-4)
+      if (admittance_acceleration < DEADBAND_EPSILON && admittance_velocity_arr_[i] < DEADBAND_EPSILON)
       {
         admittance_acceleration = 0;
       }
