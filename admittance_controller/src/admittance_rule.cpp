@@ -442,8 +442,19 @@ void AdmittanceRule::calculate_admittance_rule(
       // TODO(destogl): check if velocity is measured from hardware
 
       // Admittance contribution is summed with the feedforward acceleration
-      const double admittance_acceleration = (1 / mass_[i]) * (measured_wrench[i] - damping_[i] * admittance_velocity_arr_[i] - stiffness_[i] * pose_error[i]);
+      double admittance_acceleration = (1 / mass_[i]) * (measured_wrench[i] - damping_[i] * admittance_velocity_arr_[i] - stiffness_[i] * pose_error[i]);
+
+      // A deadband for admittance control
+      // TODO(andyz): parameterize deadband vel/accel
+      if (admittance_acceleration < 1e-4 && admittance_velocity_arr_[i] < 1e-4)
+      {
+        admittance_acceleration = 0;
+      }
+
+      // Sum admittance contribution with target acceleration
       const double acceleration = feedforward_acceleration[i] + admittance_acceleration;
+
+      RCLCPP_ERROR_STREAM(rclcpp::get_logger("AdmittanceRule"), "admit accel: " << admittance_acceleration << " ff accel: " << feedforward_acceleration[i]);
 
       // Admittance vel/accel component
       admittance_velocity_arr_[i] += (admittance_acceleration_previous_arr_[i] + admittance_acceleration) * 0.5 * period.seconds();
@@ -461,6 +472,7 @@ void AdmittanceRule::calculate_admittance_rule(
       admittance_rule_calculated_values_.effort[i] = measured_wrench[i];
     }
   }
+  RCLCPP_ERROR_STREAM(rclcpp::get_logger("AdmittanceRule"), "--");
 }
 
 controller_interface::return_type AdmittanceRule::calculate_desired_joint_state(
