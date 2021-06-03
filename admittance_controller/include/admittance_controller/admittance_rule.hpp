@@ -176,8 +176,6 @@ protected:
   std::array<double, 6> target_pose_ik_base_frame_arr_;
   std::array<double, 6> current_pose_ik_base_frame_arr_;
 
-  std::array<double, 3> angles_error_;
-
   // Admittance vel/accel components are summed with the desired, feedforward acceleration
   std::array<double, 6> admittance_velocity_arr_;
   std::array<double, 6> admittance_acceleration_previous_arr_;
@@ -228,6 +226,9 @@ private:
     output_tf = input_tf * transform;
     tf2::toMsg(output_tf, output);
   }
+
+  // TODO(andyz): initialize this
+  trajectory_msgs::msg::JointTrajectoryPoint last_commanded_state_;
 };
 
 }  // namespace admittance_controller
