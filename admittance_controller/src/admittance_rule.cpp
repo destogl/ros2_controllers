@@ -201,12 +201,6 @@ controller_interface::return_type AdmittanceRule::reset()
   feedforward_pose_ik_base_frame_ = current_pose_ik_base_frame_;
   prev_target_pose_ik_base_frame_ = current_pose_ik_base_frame_;
 
-  // "Open-loop" controller uses old desired pose as current pose: current_pose(K) = desired_pose(K-1)
-  // Therefore desired pose has to be set before calling *update*-method
-  if (open_loop_control_) {
-    get_pose_of_control_frame_in_base_frame(feedforward_pose_ik_base_frame_);
-  }
-
   // Initialize ik_tip and tool_frame transformations - those are fixed transformations
   tf2::Stamped<tf2::Transform> tf2_transform;
   try {
@@ -469,8 +463,6 @@ void AdmittanceRule::calculate_admittance_rule(
       // Sum admittance contribution with target acceleration
       const double acceleration = feedforward_acceleration[i] + admittance_acceleration;
 
-      RCLCPP_ERROR_STREAM(rclcpp::get_logger("AdmittanceRule"), "admit accel: " << admittance_acceleration << " ff accel: " << feedforward_acceleration[i]);
-
       // Admittance vel/accel component
       admittance_velocity_arr_[i] += (admittance_acceleration_previous_arr_[i] + admittance_acceleration) * 0.5 * period.seconds();
       admittance_acceleration_previous_arr_[i] = admittance_acceleration;
@@ -487,7 +479,6 @@ void AdmittanceRule::calculate_admittance_rule(
       admittance_rule_calculated_values_.effort[i] = measured_wrench[i];
     }
   }
-  RCLCPP_ERROR_STREAM(rclcpp::get_logger("AdmittanceRule"), "--");
 }
 
 controller_interface::return_type AdmittanceRule::calculate_desired_joint_state(
