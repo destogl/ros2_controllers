@@ -32,7 +32,7 @@ namespace {  // Utility namespace
 
 // TODO(andyz): parameterize deadband vel/accel
 // This is a generic numerical accuracy check for all unit types (rad, rad/s, rad/s^2)
-static constexpr double DEADBAND_EPSILON = 1e-5;
+static constexpr double DEADBAND_EPSILON = 5e-5;
 
 template<typename Type>
 void convert_message_to_array(const geometry_msgs::msg::Pose & msg, Type & vector_out)
@@ -192,7 +192,6 @@ controller_interface::return_type AdmittanceRule::reset()
   measured_wrench_control_frame_arr_.fill(0.0);
   target_pose_ik_base_frame_arr_.fill(0.0);
   current_pose_ik_base_frame_arr_.fill(0.0);
-  angles_error_.fill(0.0);
   desired_velocity_arr_.fill(0.0);
   desired_velocity_previous_arr_.fill(0.0);
   desired_acceleration_previous_arr_.fill(0.0);
@@ -235,7 +234,7 @@ controller_interface::return_type AdmittanceRule::update(
   if (!open_loop_control_) {
     get_pose_of_control_frame_in_base_frame(current_pose_ik_base_frame_);
   } else {
-    Eigen::Isometry3d control_frame_pose = ik_->get_link_transform(control_frame_);
+    Eigen::Isometry3d control_frame_pose = ik_->get_link_transform(control_frame_, last_commanded_state_);
 
     // TODO(andyz): use a convenience function for this
     current_pose_ik_base_frame_.header.frame_id = ik_base_frame_;
@@ -287,8 +286,10 @@ controller_interface::return_type AdmittanceRule::update(
     // Do clean conversion to the goal pose using transform and not messing with Euler angles
     convert_array_to_message(relative_desired_pose_arr_, relative_desired_pose_);
     // Use the Jacobian to transform a Cartesian change to joint angle change
-    return calculate_desired_joint_state(current_joint_state, period, desired_joint_state);
+    calculate_desired_joint_state(current_joint_state, period, desired_joint_state);
   }
+
+  last_commanded_state_ = desired_joint_state;
 
   return controller_interface::return_type::OK;
 }
@@ -506,6 +507,7 @@ controller_interface::return_type AdmittanceRule::calculate_desired_joint_state(
 
   // Use Jacobian-based IK
   std::vector<double> relative_desired_pose_vec(relative_desired_pose_arr_.begin(), relative_desired_pose_arr_.end());
+  ik_->update_robot_state(current_joint_state);
   if (ik_->convert_cartesian_deltas_to_joint_deltas(
     relative_desired_pose_vec, identity_transform_, relative_desired_joint_state_vec_)){
     for (auto i = 0u; i < desired_joint_state.positions.size(); ++i) {
