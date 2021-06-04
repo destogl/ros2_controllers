@@ -30,9 +30,12 @@
 
 namespace {  // Utility namespace
 
-// TODO(andyz): parameterize deadband vel/accel
-// This is a generic numerical accuracy check for all unit types (rad, rad/s, rad/s^2)
-static constexpr double DEADBAND_EPSILON = 1e-4;
+// TODO(andyz): parameterize deadband
+// Numerical accuracy checks. Used as deadbands.
+static constexpr double RELATIVE_TRANSLATION_EPSILON = 1e-6;
+static constexpr double RELATIVE_ROTATION_EPSILON = 1e-6;
+static constexpr double ADMITTANCE_VELOCITY_EPSILON = 1e-6;
+static constexpr double ADMITTANCE_ACCELERATION_EPSILON = 1e-6;
 
 template<typename Type>
 void convert_message_to_array(const geometry_msgs::msg::Pose & msg, Type & vector_out)
@@ -191,8 +194,6 @@ controller_interface::return_type AdmittanceRule::reset()
   admittance_acceleration_previous_arr_.fill(0.0);
   relative_desired_pose_arr_.fill(0.0);
   desired_velocity_arr_.fill(0.0);
-  desired_velocity_previous_arr_.fill(0.0);
-  desired_acceleration_previous_arr_.fill(0.0);
 
   get_pose_of_control_frame_in_base_frame(current_pose_ik_base_frame_);
   feedforward_pose_ik_base_frame_ = current_pose_ik_base_frame_;
@@ -244,15 +245,17 @@ controller_interface::return_type AdmittanceRule::update(
 
   // Deadband: if the net motion would be very small, simple pass the current joints through without change.
   // This prevents a slow drift.
-  double sum_of_relative_desired_pose = std::fabs(relative_desired_pose_arr_[0]) +
+  double sum_of_relative_translations = std::fabs(relative_desired_pose_arr_[0]) +
                                         std::fabs(relative_desired_pose_arr_[1]) +
-                                        std::fabs(relative_desired_pose_arr_[2]) +
-                                        std::fabs(relative_desired_pose_arr_[3]) +
-                                        std::fabs(relative_desired_pose_arr_[4]) +
-                                        std::fabs(relative_desired_pose_arr_[5]);
-  if (sum_of_relative_desired_pose < DEADBAND_EPSILON)
+                                        std::fabs(relative_desired_pose_arr_[2]);
+  double sum_of_relative_rotations = std::fabs(relative_desired_pose_arr_[3]) +
+                                     std::fabs(relative_desired_pose_arr_[4]) +
+                                     std::fabs(relative_desired_pose_arr_[5]);
+  RCLCPP_ERROR_STREAM(rclcpp::get_logger("AdmittanceRule"), sum_of_relative_translations << "  " << sum_of_relative_rotations);
+  if (sum_of_relative_translations < RELATIVE_TRANSLATION_EPSILON && sum_of_relative_rotations < RELATIVE_ROTATION_EPSILON)
   {
     reset();
+    RCLCPP_ERROR(rclcpp::get_logger("AdmittanceRule"), "DEADBAND");
     desired_joint_state = current_joint_state;
   }
   else
@@ -442,7 +445,7 @@ void AdmittanceRule::calculate_admittance_rule(
       double admittance_acceleration = (1 / mass_[i]) * (measured_wrench[i] - damping_[i] * admittance_velocity_arr_[i] - stiffness_[i] * pose_error[i]);
 
       // A deadband for admittance control
-      if (admittance_acceleration < DEADBAND_EPSILON && admittance_velocity_arr_[i] < DEADBAND_EPSILON)
+      if (admittance_acceleration < ADMITTANCE_ACCELERATION_EPSILON && admittance_velocity_arr_[i] < ADMITTANCE_VELOCITY_EPSILON)
       {
         admittance_acceleration = 0;
       }
@@ -455,10 +458,8 @@ void AdmittanceRule::calculate_admittance_rule(
       admittance_acceleration_previous_arr_[i] = admittance_acceleration;
 
       // Net vel/accel
-      desired_velocity_arr_[i] += (desired_acceleration_previous_arr_[i] + acceleration) * 0.5 * period.seconds();
-      desired_relative_pose[i] = (desired_velocity_previous_arr_[i] + desired_velocity_arr_[i]) * 0.5 * period.seconds();
-      desired_acceleration_previous_arr_[i] = acceleration;
-      desired_velocity_previous_arr_[i] = desired_velocity_arr_[i];
+      desired_velocity_arr_[i] += acceleration * period.seconds();
+      desired_relative_pose[i] = desired_velocity_arr_[i] * period.seconds();
 
       admittance_rule_calculated_values_.positions[i] = pose_error[i];
       admittance_rule_calculated_values_.velocities[i] = desired_velocity_arr_[i];

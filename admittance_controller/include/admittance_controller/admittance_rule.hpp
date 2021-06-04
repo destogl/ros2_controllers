@@ -204,8 +204,6 @@ private:
 
   std::array<double, 6> relative_desired_pose_arr_;
   std::array<double, 6> desired_velocity_arr_;
-  std::array<double, 6> desired_velocity_previous_arr_;
-  std::array<double, 6> desired_acceleration_previous_arr_;
 
   std::vector<double> relative_desired_joint_state_vec_;
 
