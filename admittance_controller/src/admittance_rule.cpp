@@ -251,11 +251,9 @@ controller_interface::return_type AdmittanceRule::update(
   double sum_of_relative_rotations = std::fabs(relative_desired_pose_arr_[3]) +
                                      std::fabs(relative_desired_pose_arr_[4]) +
                                      std::fabs(relative_desired_pose_arr_[5]);
-  RCLCPP_ERROR_STREAM(rclcpp::get_logger("AdmittanceRule"), sum_of_relative_translations << "  " << sum_of_relative_rotations);
   if (sum_of_relative_translations < RELATIVE_TRANSLATION_EPSILON && sum_of_relative_rotations < RELATIVE_ROTATION_EPSILON)
   {
     reset();
-    RCLCPP_ERROR(rclcpp::get_logger("AdmittanceRule"), "DEADBAND");
     desired_joint_state = current_joint_state;
   }
   else
