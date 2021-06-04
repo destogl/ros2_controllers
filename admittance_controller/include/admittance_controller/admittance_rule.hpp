@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-/// \author: Denis Stogl
+/// \author: Denis Stogl, Andy Zelenak
 
 #ifndef ADMITTANCE_CONTROLLER__ADMITTANCE_RULE_HPP_
 #define ADMITTANCE_CONTROLLER__ADMITTANCE_RULE_HPP_
@@ -134,15 +134,41 @@ protected:
     trajectory_msgs::msg::JointTrajectoryPoint & desired_joint_state
   );
 
-  // IK variables
-  std::shared_ptr<MoveItKinematics> ik_;
+private:
+  template<typename MsgType>
+  controller_interface::return_type
+  transform_message_to_ik_base_frame(const MsgType & message_in, MsgType & message_out)
+  {
+    if (ik_base_frame_ != message_in.header.frame_id) {
+      try {
+        geometry_msgs::msg::TransformStamped transform = tf_buffer_->lookupTransform(
+          ik_base_frame_, message_in.header.frame_id, tf2::TimePointZero);
+        tf2::doTransform(message_in, message_out, transform);
+      } catch (const tf2::TransformException & e) {
+        // TODO(destogl): Use RCLCPP_ERROR_THROTTLE
+        RCLCPP_ERROR(rclcpp::get_logger("AdmittanceRule"), "LookupTransform failed from '" +
+        message_in.header.frame_id + "' to '" + ik_base_frame_ + "'.");
+        return controller_interface::return_type::ERROR;
+      }
+    } else {
+      message_out = message_in;
+    }
+    return controller_interface::return_type::OK;
+  }
 
-  // Filters
-//   using GravityCompensatorType =
-//     iirob_filters::GravityCompensator<geometry_msgs::msg::WrenchStamped>;
-//
-//   std::unique_ptr<GravityCompensatorType> wrist_gravity_compensator_;
-//   std::unique_ptr<GravityCompensatorType> tool_gravity_compensator_;
+  template<typename Type>
+  void
+  direct_transform(const Type & input, const tf2::Transform & transform, Type & output)
+  {
+    // use TF2 data types for easy math
+    tf2::Transform input_tf, output_tf;
+
+    tf2::fromMsg(input, input_tf);
+    output_tf = input_tf * transform;
+    tf2::toMsg(output_tf, output);
+  }
+
+  std::shared_ptr<MoveItKinematics> ik_;
 
   // Transformation variables
   std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
@@ -192,40 +218,6 @@ protected:
   // "positions" hold "pose_error" values
   // "effort" hold "measured_wrench" values
   trajectory_msgs::msg::JointTrajectoryPoint admittance_rule_calculated_values_;
-
-private:
-  template<typename MsgType>
-  controller_interface::return_type
-  transform_message_to_ik_base_frame(const MsgType & message_in, MsgType & message_out)
-  {
-    if (ik_base_frame_ != message_in.header.frame_id) {
-      try {
-        geometry_msgs::msg::TransformStamped transform = tf_buffer_->lookupTransform(
-          ik_base_frame_, message_in.header.frame_id, tf2::TimePointZero);
-        tf2::doTransform(message_in, message_out, transform);
-      } catch (const tf2::TransformException & e) {
-        // TODO(destogl): Use RCLCPP_ERROR_THROTTLE
-        RCLCPP_ERROR(rclcpp::get_logger("AdmittanceRule"), "LookupTransform failed from '" +
-        message_in.header.frame_id + "' to '" + ik_base_frame_ + "'.");
-        return controller_interface::return_type::ERROR;
-      }
-    } else {
-      message_out = message_in;
-    }
-    return controller_interface::return_type::OK;
-  }
-
-  template<typename Type>
-  void
-  direct_transform(const Type & input, const tf2::Transform & transform, Type & output)
-  {
-    // use TF2 data types for easy math
-    tf2::Transform input_tf, output_tf;
-
-    tf2::fromMsg(input, input_tf);
-    output_tf = input_tf * transform;
-    tf2::toMsg(output_tf, output);
-  }
 };
 
 }  // namespace admittance_controller
