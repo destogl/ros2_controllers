@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-/// \author: Denis Stogl
+/// \author: Denis Stogl, Andy Zelenak
 
 #include <chrono>
 #include <functional>
