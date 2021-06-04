@@ -32,7 +32,7 @@ namespace {  // Utility namespace
 
 // TODO(andyz): parameterize deadband vel/accel
 // This is a generic numerical accuracy check for all unit types (rad, rad/s, rad/s^2)
-static constexpr double DEADBAND_EPSILON = 5e-5;
+static constexpr double DEADBAND_EPSILON = 1e-4;
 
 template<typename Type>
 void convert_message_to_array(const geometry_msgs::msg::Pose & msg, Type & vector_out)
@@ -234,19 +234,7 @@ controller_interface::return_type AdmittanceRule::update(
   if (!open_loop_control_) {
     get_pose_of_control_frame_in_base_frame(current_pose_ik_base_frame_);
   } else {
-    Eigen::Isometry3d control_frame_pose = ik_->get_link_transform(control_frame_, last_commanded_state_);
-
-    // TODO(andyz): use a convenience function for this
-    current_pose_ik_base_frame_.header.frame_id = ik_base_frame_;
-    current_pose_ik_base_frame_.pose.position.x = control_frame_pose.translation().x();
-    current_pose_ik_base_frame_.pose.position.x = control_frame_pose.translation().y();
-    current_pose_ik_base_frame_.pose.position.x = control_frame_pose.translation().z();
-
-    Eigen::Quaterniond quat(control_frame_pose.rotation());
-    current_pose_ik_base_frame_.pose.orientation.w = quat.w();
-    current_pose_ik_base_frame_.pose.orientation.x = quat.x();
-    current_pose_ik_base_frame_.pose.orientation.y = quat.y();
-    current_pose_ik_base_frame_.pose.orientation.z = quat.z();
+    current_pose_ik_base_frame_ = prev_target_pose_ik_base_frame_;
   }
 
   // Convert all data to arrays for simpler calculation
@@ -275,10 +263,19 @@ controller_interface::return_type AdmittanceRule::update(
 
   // Deadband: if the net motion would be very small, simple pass the current joints through without change.
   // This prevents a slow drift.
-  double sum_of_relative_desired_pose = std::accumulate(relative_desired_pose_arr_.begin(), relative_desired_pose_arr_.end(), sum_of_relative_desired_pose);
-  if (std::fabs(sum_of_relative_desired_pose) < DEADBAND_EPSILON)
+  double sum_of_relative_desired_pose = std::fabs(relative_desired_pose_arr_[0]) +
+                                        std::fabs(relative_desired_pose_arr_[1]) +
+                                        std::fabs(relative_desired_pose_arr_[2]) +
+                                        std::fabs(relative_desired_pose_arr_[3]) +
+                                        std::fabs(relative_desired_pose_arr_[4]) +
+                                        std::fabs(relative_desired_pose_arr_[5]);
+  if (sum_of_relative_desired_pose < DEADBAND_EPSILON)
   {
     desired_joint_state = current_joint_state;
+
+    prev_feedforward_velocity_ik_base_frame_.fill(0.0);
+    admittance_acceleration_previous_arr_.fill(0.0);
+    admittance_velocity_arr_.fill(0.0);
   }
   else
   {
@@ -288,8 +285,6 @@ controller_interface::return_type AdmittanceRule::update(
     // Use the Jacobian to transform a Cartesian change to joint angle change
     calculate_desired_joint_state(current_joint_state, period, desired_joint_state);
   }
-
-  last_commanded_state_ = desired_joint_state;
 
   return controller_interface::return_type::OK;
 }
@@ -464,7 +459,8 @@ void AdmittanceRule::calculate_admittance_rule(
     if (selected_axes_[i]) {
       // TODO(destogl): check if velocity is measured from hardware
 
-      // Admittance contribution is summed with the feedforward acceleration
+      // Admittance contribution is summed with the feedforward acceleration.
+      // We need a "prior commanded joint state" to do the admittance calc, so wait for that.
       double admittance_acceleration = (1 / mass_[i]) * (measured_wrench[i] - damping_[i] * admittance_velocity_arr_[i] - stiffness_[i] * pose_error[i]);
 
       // A deadband for admittance control
@@ -513,7 +509,6 @@ controller_interface::return_type AdmittanceRule::calculate_desired_joint_state(
     for (auto i = 0u; i < desired_joint_state.positions.size(); ++i) {
       desired_joint_state.positions[i] = current_joint_state.positions[i] + relative_desired_joint_state_vec_[i];
       desired_joint_state.velocities[i] = relative_desired_joint_state_vec_[i] / period.seconds();
-      //       RCLCPP_INFO(rclcpp::get_logger("AR"), "joint states [%zu]: %f + %f = %f", i, current_joint_state.positions[i], relative_desired_joint_state_vec_[i], desired_joint_state.positions[i]);
     }
     } else {
       RCLCPP_ERROR(rclcpp::get_logger("AdmittanceRule"), "Conversion of Cartesian deltas to joint deltas failed. Sending current joint values to the robot.");

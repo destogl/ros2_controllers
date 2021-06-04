@@ -226,9 +226,6 @@ private:
     output_tf = input_tf * transform;
     tf2::toMsg(output_tf, output);
   }
-
-  // TODO(andyz): initialize this
-  trajectory_msgs::msg::JointTrajectoryPoint last_commanded_state_;
 };
 
 }  // namespace admittance_controller
