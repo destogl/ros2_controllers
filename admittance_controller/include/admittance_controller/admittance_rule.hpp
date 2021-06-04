@@ -174,9 +174,6 @@ private:
   std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
 
-  tf2::Transform ik_tip_to_control_frame_tf_;
-  tf2::Transform control_frame_to_ik_tip_tf_;
-
   // measured_wrench_ could arrive in any frame. It will be transformed
   geometry_msgs::msg::WrenchStamped measured_wrench_;
   geometry_msgs::msg::WrenchStamped measured_wrench_filtered_;
@@ -192,7 +189,6 @@ private:
   // Need to save the previous velocity to calculate acceleration
   std::array<double, 6> prev_feedforward_velocity_ik_base_frame_;
 
-  geometry_msgs::msg::WrenchStamped target_force_ik_base_frame_;
   geometry_msgs::msg::PoseStamped target_pose_ik_base_frame_;
   geometry_msgs::msg::PoseStamped prev_target_pose_ik_base_frame_;
   geometry_msgs::msg::TransformStamped relative_desired_pose_;

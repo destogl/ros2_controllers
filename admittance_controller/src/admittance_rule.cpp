@@ -198,20 +198,6 @@ controller_interface::return_type AdmittanceRule::reset()
   feedforward_pose_ik_base_frame_ = current_pose_ik_base_frame_;
   prev_target_pose_ik_base_frame_ = current_pose_ik_base_frame_;
 
-  // Initialize ik_tip and tool_frame transformations - those are fixed transformations
-  tf2::Stamped<tf2::Transform> tf2_transform;
-  try {
-    auto transform = tf_buffer_->lookupTransform(ik_tip_frame_, control_frame_, tf2::TimePointZero);
-    tf2::fromMsg(transform, tf2_transform);
-    ik_tip_to_control_frame_tf_ = tf2_transform;
-    control_frame_to_ik_tip_tf_ = tf2_transform.inverse();
-  } catch (const tf2::TransformException & e) {
-    // TODO(destogl): Use RCLCPP_ERROR_THROTTLE
-    RCLCPP_ERROR(rclcpp::get_logger("AdmittanceRule"), "LookupTransform failed from '" +
-    control_frame_ + "' to '" + ik_tip_frame_ + "'.");
-    return controller_interface::return_type::ERROR;
-  }
-
   return controller_interface::return_type::OK;
 }
 
@@ -498,10 +484,10 @@ controller_interface::return_type AdmittanceRule::calculate_desired_joint_state(
   ik_->update_robot_state(current_joint_state);
   if (ik_->convert_cartesian_deltas_to_joint_deltas(
     relative_desired_pose_vec, identity_transform_, relative_desired_joint_state_vec_)){
-    for (auto i = 0u; i < desired_joint_state.positions.size(); ++i) {
-      desired_joint_state.positions[i] = current_joint_state.positions[i] + relative_desired_joint_state_vec_[i];
-      desired_joint_state.velocities[i] = relative_desired_joint_state_vec_[i] / period.seconds();
-    }
+      for (auto i = 0u; i < desired_joint_state.positions.size(); ++i) {
+        desired_joint_state.positions[i] = current_joint_state.positions[i] + relative_desired_joint_state_vec_[i];
+        desired_joint_state.velocities[i] = relative_desired_joint_state_vec_[i] / period.seconds();
+      }
     } else {
       RCLCPP_ERROR(rclcpp::get_logger("AdmittanceRule"), "Conversion of Cartesian deltas to joint deltas failed. Sending current joint values to the robot.");
       desired_joint_state = current_joint_state;
