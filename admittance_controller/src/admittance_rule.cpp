@@ -44,9 +44,6 @@ void convert_message_to_array(const geometry_msgs::msg::Pose & msg, Type & vecto
   tf2::fromMsg(msg.orientation, q);
   q.normalize();
   tf2::Matrix3x3(q).getRPY(vector_out[3], vector_out[4], vector_out[5]);
-  for (auto i = 3u; i < 6; ++i) {
-    vector_out[i] = angles::normalize_angle(vector_out[i]);
-  }
 }
 
 template<typename Type>
@@ -66,9 +63,6 @@ void convert_message_to_array(const geometry_msgs::msg::Transform & msg, Type & 
   tf2::fromMsg(msg.rotation, q);
   q.normalize();
   tf2::Matrix3x3(q).getRPY(vector_out[3], vector_out[4], vector_out[5]);
-  for (auto i = 3u; i < 6; ++i) {
-    vector_out[i] = angles::normalize_angle(vector_out[i]);
-  }
 }
 
 template<typename Type>
@@ -189,9 +183,13 @@ controller_interface::return_type AdmittanceRule::configure(rclcpp::Node::Shared
 
 controller_interface::return_type AdmittanceRule::reset()
 {
+  feedforward_velocity_ik_base_frame_.fill(0.0);
+  prev_feedforward_velocity_ik_base_frame_.fill(0.0);
   measured_wrench_control_frame_arr_.fill(0.0);
   target_pose_ik_base_frame_arr_.fill(0.0);
-  current_pose_ik_base_frame_arr_.fill(0.0);
+  admittance_velocity_arr_.fill(0.0);
+  admittance_acceleration_previous_arr_.fill(0.0);
+  relative_desired_pose_arr_.fill(0.0);
   desired_velocity_arr_.fill(0.0);
   desired_velocity_previous_arr_.fill(0.0);
   desired_acceleration_previous_arr_.fill(0.0);
@@ -247,9 +245,6 @@ controller_interface::return_type AdmittanceRule::update(
 
   for (auto i = 0u; i < 6; ++i) {
     pose_error[i] = current_pose_ik_base_frame_arr_[i] - target_pose_ik_base_frame_arr_[i];
-    if (i >= 3) {
-      pose_error[i] = angles::normalize_angle(pose_error[i]);
-    }
     // Estimate feedforward acceleration
     feedforward_acceleration[i] = (feedforward_velocity_ik_base_frame_[i] - prev_feedforward_velocity_ik_base_frame_[i]) / period.seconds();
   }
@@ -271,11 +266,8 @@ controller_interface::return_type AdmittanceRule::update(
                                         std::fabs(relative_desired_pose_arr_[5]);
   if (sum_of_relative_desired_pose < DEADBAND_EPSILON)
   {
+    reset();
     desired_joint_state = current_joint_state;
-
-    prev_feedforward_velocity_ik_base_frame_.fill(0.0);
-    admittance_acceleration_previous_arr_.fill(0.0);
-    admittance_velocity_arr_.fill(0.0);
   }
   else
   {
