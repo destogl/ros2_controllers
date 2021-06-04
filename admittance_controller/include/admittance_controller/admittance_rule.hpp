@@ -47,7 +47,7 @@ public:
 
   controller_interface::return_type configure(rclcpp::Node::SharedPtr node);
 
-  controller_interface::return_type reset();
+  controller_interface::return_type reset(bool reset_admittance = true);
 
   controller_interface::return_type update(
     const trajectory_msgs::msg::JointTrajectoryPoint & current_joint_state,

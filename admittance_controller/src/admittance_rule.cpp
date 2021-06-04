@@ -32,8 +32,8 @@ namespace {  // Utility namespace
 
 // TODO(andyz): parameterize deadband
 // Numerical accuracy checks. Used as deadbands.
-static constexpr double RELATIVE_TRANSLATION_EPSILON = 1e-6;
-static constexpr double RELATIVE_ROTATION_EPSILON = 1e-6;
+static constexpr double RELATIVE_TRANSLATION_EPSILON = 1e-7;
+static constexpr double RELATIVE_ROTATION_EPSILON = 1e-7;
 
 template<typename Type>
 void convert_message_to_array(const geometry_msgs::msg::Pose & msg, Type & vector_out)
@@ -182,23 +182,28 @@ controller_interface::return_type AdmittanceRule::configure(rclcpp::Node::Shared
   return controller_interface::return_type::OK;
 }
 
-controller_interface::return_type AdmittanceRule::reset()
+controller_interface::return_type AdmittanceRule::reset(bool reset_admittance)
 {
   feedforward_velocity_ik_base_frame_.fill(0.0);
   prev_feedforward_velocity_ik_base_frame_.fill(0.0);
-  measured_wrench_control_frame_arr_.fill(0.0);
   target_pose_ik_base_frame_arr_.fill(0.0);
-  admittance_velocity_arr_.fill(0.0);
-  admittance_acceleration_previous_arr_.fill(0.0);
   relative_desired_pose_arr_.fill(0.0);
   desired_velocity_arr_.fill(0.0);
 
   get_pose_of_control_frame_in_base_frame(current_pose_ik_base_frame_);
-  feedforward_pose_ik_base_frame_ = current_pose_ik_base_frame_;
-  prev_target_pose_ik_base_frame_ = current_pose_ik_base_frame_;
 
-  convert_message_to_array(current_pose_ik_base_frame_, current_pose_ik_base_frame_arr_);
-  admittance_reference_pose_ik_base_frame_arr_ = current_pose_ik_base_frame_arr_;
+  if (reset_admittance)
+  {
+    admittance_velocity_arr_.fill(0.0);
+    admittance_acceleration_previous_arr_.fill(0.0);
+    measured_wrench_control_frame_arr_.fill(0.0);
+    convert_message_to_array(current_pose_ik_base_frame_, current_pose_ik_base_frame_arr_);
+    // Initially, admittance pose matches user-requested reference pose
+    admittance_reference_pose_ik_base_frame_arr_ = current_pose_ik_base_frame_arr_;
+
+    feedforward_pose_ik_base_frame_ = current_pose_ik_base_frame_;
+    prev_target_pose_ik_base_frame_ = current_pose_ik_base_frame_;
+  }
 
   return controller_interface::return_type::OK;
 }
@@ -256,9 +261,9 @@ controller_interface::return_type AdmittanceRule::update(
   double sum_of_relative_rotations = std::fabs(relative_desired_pose_arr_[3]) +
                                      std::fabs(relative_desired_pose_arr_[4]) +
                                      std::fabs(relative_desired_pose_arr_[5]);
-  if (0) //sum_of_relative_translations < RELATIVE_TRANSLATION_EPSILON && sum_of_relative_rotations < RELATIVE_ROTATION_EPSILON)
+  if (sum_of_relative_translations < RELATIVE_TRANSLATION_EPSILON && sum_of_relative_rotations < RELATIVE_ROTATION_EPSILON)
   {
-    reset();
+    reset(false /* do not reset admittance */);
     desired_joint_state = current_joint_state;
   }
   else
