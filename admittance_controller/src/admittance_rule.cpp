@@ -32,8 +32,8 @@ namespace {  // Utility namespace
 
 // TODO(andyz): parameterize deadband
 // Numerical accuracy checks. Used as deadbands.
-static constexpr double RELATIVE_TRANSLATION_EPSILON = 1e-7;
-static constexpr double RELATIVE_ROTATION_EPSILON = 1e-7;
+static constexpr double RELATIVE_TRANSLATION_EPSILON = 1e-5;
+static constexpr double RELATIVE_ROTATION_EPSILON = 1e-5;
 
 template<typename Type>
 void convert_message_to_array(const geometry_msgs::msg::Pose & msg, Type & vector_out)
