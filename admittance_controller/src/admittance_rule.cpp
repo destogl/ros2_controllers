@@ -34,8 +34,6 @@ namespace {  // Utility namespace
 // Numerical accuracy checks. Used as deadbands.
 static constexpr double RELATIVE_TRANSLATION_EPSILON = 1e-6;
 static constexpr double RELATIVE_ROTATION_EPSILON = 1e-6;
-static constexpr double ADMITTANCE_VELOCITY_EPSILON = 1e-6;
-static constexpr double ADMITTANCE_ACCELERATION_EPSILON = 1e-6;
 
 template<typename Type>
 void convert_message_to_array(const geometry_msgs::msg::Pose & msg, Type & vector_out)
@@ -199,6 +197,9 @@ controller_interface::return_type AdmittanceRule::reset()
   feedforward_pose_ik_base_frame_ = current_pose_ik_base_frame_;
   prev_target_pose_ik_base_frame_ = current_pose_ik_base_frame_;
 
+  convert_message_to_array(current_pose_ik_base_frame_, current_pose_ik_base_frame_arr_);
+  admittance_reference_pose_ik_base_frame_arr_ = current_pose_ik_base_frame_arr_;
+
   return controller_interface::return_type::OK;
 }
 
@@ -231,7 +232,7 @@ controller_interface::return_type AdmittanceRule::update(
   std::array<double, 6> feedforward_acceleration;
 
   for (auto i = 0u; i < 6; ++i) {
-    pose_error[i] = current_pose_ik_base_frame_arr_[i] - target_pose_ik_base_frame_arr_[i];
+    pose_error[i] = admittance_reference_pose_ik_base_frame_arr_[i] - target_pose_ik_base_frame_arr_[i];
     // Estimate feedforward acceleration
     feedforward_acceleration[i] = (feedforward_velocity_ik_base_frame_[i] - prev_feedforward_velocity_ik_base_frame_[i]) / period.seconds();
   }
@@ -243,6 +244,10 @@ controller_interface::return_type AdmittanceRule::update(
   calculate_admittance_rule(measured_wrench_control_frame_arr_, pose_error, feedforward_acceleration, period,
                             relative_desired_pose_arr_);
 
+  for (auto i = 0u; i < 6; ++i) {
+    admittance_reference_pose_ik_base_frame_arr_[i] += relative_desired_pose_arr_[i];
+  }
+
   // Deadband: if the net motion would be very small, simple pass the current joints through without change.
   // This prevents a slow drift.
   double sum_of_relative_translations = std::fabs(relative_desired_pose_arr_[0]) +
@@ -251,7 +256,7 @@ controller_interface::return_type AdmittanceRule::update(
   double sum_of_relative_rotations = std::fabs(relative_desired_pose_arr_[3]) +
                                      std::fabs(relative_desired_pose_arr_[4]) +
                                      std::fabs(relative_desired_pose_arr_[5]);
-  if (sum_of_relative_translations < RELATIVE_TRANSLATION_EPSILON && sum_of_relative_rotations < RELATIVE_ROTATION_EPSILON)
+  if (0) //sum_of_relative_translations < RELATIVE_TRANSLATION_EPSILON && sum_of_relative_rotations < RELATIVE_ROTATION_EPSILON)
   {
     reset();
     desired_joint_state = current_joint_state;
@@ -441,12 +446,6 @@ void AdmittanceRule::calculate_admittance_rule(
       // Admittance contribution is summed with the feedforward acceleration.
       // We need a "prior commanded joint state" to do the admittance calc, so wait for that.
       double admittance_acceleration = (1 / mass_[i]) * (measured_wrench[i] - damping_[i] * admittance_velocity_arr_[i] - stiffness_[i] * pose_error[i]);
-
-      // A deadband for admittance control
-      if (admittance_acceleration < ADMITTANCE_ACCELERATION_EPSILON && admittance_velocity_arr_[i] < ADMITTANCE_VELOCITY_EPSILON)
-      {
-        admittance_acceleration = 0;
-      }
 
       // Sum admittance contribution with target acceleration
       const double acceleration = feedforward_acceleration[i] + admittance_acceleration;

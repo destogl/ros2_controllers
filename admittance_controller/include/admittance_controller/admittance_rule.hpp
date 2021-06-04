@@ -197,6 +197,9 @@ private:
   std::array<double, 6> measured_wrench_control_frame_arr_;
   std::array<double, 6> target_pose_ik_base_frame_arr_;
   std::array<double, 6> current_pose_ik_base_frame_arr_;
+  // Track admittance reference pose separately from the user's perfect reference pose.
+  // This variable equals target_pose_ik_base_frame_arr_ + integration of admittance effects.
+  std::array<double, 6> admittance_reference_pose_ik_base_frame_arr_;
 
   // Admittance vel/accel components are summed with the desired, feedforward acceleration
   std::array<double, 6> admittance_velocity_arr_;
