@@ -52,9 +52,9 @@ public:
   controller_interface::return_type update(
     const trajectory_msgs::msg::JointTrajectoryPoint & current_joint_state,
     const geometry_msgs::msg::Wrench & measured_wrench,
-    const geometry_msgs::msg::PoseStamped & target_pose,
+    const geometry_msgs::msg::PoseStamped & reference_pose,
     const rclcpp::Duration & period,
-    trajectory_msgs::msg::JointTrajectoryPoint & desired_joint_states
+    trajectory_msgs::msg::JointTrajectoryPoint & output_joint_states
   );
 
   controller_interface::return_type update(
@@ -62,7 +62,7 @@ public:
     const geometry_msgs::msg::Wrench & measured_wrench,
     const std::array<double, 6> & target_joint_deltas,
     const rclcpp::Duration & period,
-    trajectory_msgs::msg::JointTrajectoryPoint & desired_joint_states
+    trajectory_msgs::msg::JointTrajectoryPoint & output_joint_states
   );
 
   controller_interface::return_type update(
@@ -71,7 +71,7 @@ public:
     const geometry_msgs::msg::PoseStamped & target_pose,
     const geometry_msgs::msg::WrenchStamped & target_force,
     const rclcpp::Duration & period,
-    trajectory_msgs::msg::JointTrajectoryPoint & desired_joint_states
+    trajectory_msgs::msg::JointTrajectoryPoint & output_joint_states
   );
 
   controller_interface::return_type get_controller_state(
@@ -123,12 +123,12 @@ protected:
   void calculate_admittance_rule(
     const std::array<double, 6> & measured_wrench,
     const std::array<double, 6> & pose_error,
-    const std::array<double, 6> & feedforward_acceleration,
+    const std::array<double, 6> & reference_acceleration,
     const rclcpp::Duration & period,
     std::array<double, 6> & desired_relative_pose
   );
 
-  controller_interface::return_type calculate_desired_joint_state(
+  controller_interface::return_type calculate_output_joint_state(
     const trajectory_msgs::msg::JointTrajectoryPoint & current_joint_state,
     const rclcpp::Duration & period,
     trajectory_msgs::msg::JointTrajectoryPoint & desired_joint_state
@@ -183,31 +183,27 @@ private:
 
   geometry_msgs::msg::PoseStamped current_pose_ik_base_frame_;
 
-  // This is the feedforward pose. Where should the end effector be with no wrench applied?
-  geometry_msgs::msg::PoseStamped feedforward_pose_ik_base_frame_;
-  std::array<double, 6> feedforward_velocity_ik_base_frame_;
+  // This is the reference pose. Where should the end effector be with no wrench applied?
+  geometry_msgs::msg::PoseStamped reference_pose_ik_base_frame_;
+  std::array<double, 6> reference_velocity_ik_base_frame_;
   // Need to save the previous velocity to calculate acceleration
-  std::array<double, 6> prev_feedforward_velocity_ik_base_frame_;
-
-  geometry_msgs::msg::PoseStamped target_pose_ik_base_frame_;
-  geometry_msgs::msg::PoseStamped prev_target_pose_ik_base_frame_;
+  std::array<double, 6> prev_reference_velocity_ik_base_frame_;
+  geometry_msgs::msg::PoseStamped prev_reference_pose_ik_base_frame_;
   geometry_msgs::msg::TransformStamped relative_desired_pose_;
 
   // Pre-reserved update-loop variables
   std::array<double, 6> measured_wrench_control_frame_arr_;
-  std::array<double, 6> target_pose_ik_base_frame_arr_;
+  std::array<double, 6> reference_pose_ik_base_frame_arr_;
   std::array<double, 6> current_pose_ik_base_frame_arr_;
   // Track admittance reference pose separately from the user's perfect reference pose.
-  // This variable equals target_pose_ik_base_frame_arr_ + integration of admittance effects.
-  std::array<double, 6> admittance_reference_pose_ik_base_frame_arr_;
+  // This variable equals reference_pose_ik_base_frame_arr_ + integration of admittance effects.
+  std::array<double, 6> admittance_pose_ik_base_frame_arr_;
 
-  // Admittance vel/accel components are summed with the desired, feedforward acceleration
+  // Admittance vel/accel components are summed with the desired, reference acceleration
   std::array<double, 6> admittance_velocity_arr_;
   std::array<double, 6> admittance_acceleration_previous_arr_;
 
   std::array<double, 6> relative_desired_pose_arr_;
-  std::array<double, 6> desired_velocity_arr_;
-
   std::vector<double> relative_desired_joint_state_vec_;
 
   // TODO(destogl): find out better datatype for this
