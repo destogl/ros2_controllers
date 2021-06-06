@@ -52,6 +52,7 @@ public:
   controller_interface::return_type update(
     const trajectory_msgs::msg::JointTrajectoryPoint & current_joint_state,
     const geometry_msgs::msg::Wrench & measured_wrench,
+    const std::array<double, 6> & reference_joint_deltas,
     const geometry_msgs::msg::PoseStamped & reference_pose,
     const rclcpp::Duration & period,
     trajectory_msgs::msg::JointTrajectoryPoint & output_joint_states
@@ -60,7 +61,7 @@ public:
   controller_interface::return_type update(
     const trajectory_msgs::msg::JointTrajectoryPoint & current_joint_state,
     const geometry_msgs::msg::Wrench & measured_wrench,
-    const std::array<double, 6> & target_joint_deltas,
+    const std::array<double, 6> & reference_joint_deltas,
     const rclcpp::Duration & period,
     trajectory_msgs::msg::JointTrajectoryPoint & output_joint_states
   );
@@ -68,8 +69,8 @@ public:
   controller_interface::return_type update(
     const trajectory_msgs::msg::JointTrajectoryPoint & current_joint_state,
     const geometry_msgs::msg::Wrench & measured_wrench,
-    const geometry_msgs::msg::PoseStamped & target_pose,
-    const geometry_msgs::msg::WrenchStamped & target_force,
+    const geometry_msgs::msg::PoseStamped & reference_pose,
+    const geometry_msgs::msg::WrenchStamped & reference_wrench,
     const rclcpp::Duration & period,
     trajectory_msgs::msg::JointTrajectoryPoint & output_joint_states
   );
@@ -123,13 +124,14 @@ protected:
   void calculate_admittance_rule(
     const std::array<double, 6> & measured_wrench,
     const std::array<double, 6> & pose_error,
-    const std::array<double, 6> & reference_acceleration,
     const rclcpp::Duration & period,
     std::array<double, 6> & desired_relative_pose
   );
 
   controller_interface::return_type calculate_output_joint_state(
     const trajectory_msgs::msg::JointTrajectoryPoint & current_joint_state,
+    const std::array<double, 6> & reference_joint_deltas,
+    const std::array<double, 6>& relative_desired_pose_arr,
     const rclcpp::Duration & period,
     trajectory_msgs::msg::JointTrajectoryPoint & desired_joint_state
   );
