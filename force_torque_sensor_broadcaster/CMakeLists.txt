@@ -13,6 +13,7 @@ endif()
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(controller_interface REQUIRED)
+find_package(filters REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(hardware_interface REQUIRED)
 find_package(pluginlib REQUIRED)
@@ -33,8 +34,9 @@ target_include_directories(
 )
 ament_target_dependencies(
   force_torque_sensor_broadcaster
-  geometry_msgs
   controller_interface
+  filters
+  geometry_msgs
   hardware_interface
   pluginlib
   rclcpp
@@ -109,11 +111,12 @@ ament_export_libraries(
 )
 ament_export_dependencies(
   controller_interface
+  filters
+  geometry_msgs
+  hardware_interface
   pluginlib
   rclcpp
   rclcpp_lifecycle
-  geometry_msgs
-  hardware_interface
 )
 
 ament_package()
