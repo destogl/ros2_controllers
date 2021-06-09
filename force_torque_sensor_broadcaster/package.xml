@@ -12,12 +12,12 @@
   <buildtool_depend>ament_cmake</buildtool_depend>
 
   <depend>controller_interface</depend>
+  <depend>filters</depend>
   <depend>geometry_msgs</depend>
   <depend>hardware_interface</depend>
   <depend>pluginlib</depend>
   <depend>rclcpp</depend>
   <depend>rclcpp_lifecycle</depend>
-  <depend>filters</depend>
 
   <test_depend>ament_cmake_gmock</test_depend>
   <test_depend>controller_manager</test_depend>

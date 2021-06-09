@@ -324,38 +324,9 @@ controller_interface::return_type AdmittanceRule::update(
   update(current_joint_state, measured_wrench, reference_pose_from_joint_deltas_ik_base_frame_,
          period, desired_joint_state);
 
-  auto is_measured_wrench_zero = [&]() {
-    std::array<double, 6> measured_wrench_arr;
-    convert_message_to_array(measured_wrench, measured_wrench_arr);
-    double accumulated = accumulate_absolute(measured_wrench_arr);
-    return (accumulated < WRENCH_EPSILON || std::isnan(accumulated));
-  };
-
-  auto is_relative_admittance_pose_zero = [&]() {
-    return (accumulate_absolute(relative_admittance_pose_arr_) < POSE_EPSILON);
-  };
-
-  // FIXME(destogl): (?) This logic could cause "joy" (large jerk) on contact
-  // Please do not delete until we find a solution
-  // This logic enables to execute feedforward movements without triggering admittance calculation
-  if (feedforward_commanded_input_) {
-    if (is_measured_wrench_zero() && !movement_caused_by_wrench_) {
-      for (auto i = 0u; i < desired_joint_state.positions.size(); ++i) {
-        desired_joint_state.positions[i] = current_joint_state.positions[i] + reference_joint_deltas[i];
-        desired_joint_state.velocities[i] = reference_joint_deltas[i] / period.seconds();
-        admittance_velocity_arr_[i] = 0;
-      }
-    } else {
-      for (auto i = 0u; i < desired_joint_state.positions.size(); ++i) {
-        desired_joint_state.positions[i] += reference_joint_deltas[i];
-        desired_joint_state.velocities[i] += reference_joint_deltas[i] / period.seconds();
-      }
-      if (is_relative_admittance_pose_zero()) {
-        movement_caused_by_wrench_ = false;
-      } else {
-        movement_caused_by_wrench_ = true;
-      }
-    }
+  for (auto i = 0u; i < desired_joint_state.positions.size(); ++i) {
+    desired_joint_state.positions[i] += reference_joint_deltas[i];
+    desired_joint_state.velocities[i] += reference_joint_deltas[i] / period.seconds();
   }
 
   return controller_interface::return_type::OK;
@@ -429,37 +400,8 @@ void AdmittanceRule::process_wrench_measurements(
   const geometry_msgs::msg::Wrench & measured_wrench
 )
 {
-  // TODO(andyz): Implement gravity comp. For now, just pass the measured wrench through
   measured_wrench_.wrench = measured_wrench;
-  measured_wrench_filtered_ = measured_wrench_;
-
-  // // get current states, and transform those into controller frame
-  // measured_wrench_.wrench = measured_wrench;
-  // try {
-  //   auto transform_to_world = tf_buffer_->lookupTransform(fixed_world_frame_,  measured_wrench_.header.frame_id, tf2::TimePointZero);
-  //   auto transform_to_sensor = tf_buffer_->lookupTransform(measured_wrench_.header.frame_id, fixed_world_frame_, tf2::TimePointZero);
-
-  //   geometry_msgs::msg::WrenchStamped measured_wrench_transformed;
-  //   tf2::doTransform(measured_wrench_, measured_wrench_transformed, transform_to_world);
-
-  //   geometry_msgs::msg::Vector3Stamped cog_transformed;
-  //   for (const auto & params : gravity_compensation_params_) {
-  //     auto transform_cog = tf_buffer_->lookupTransform(fixed_world_frame_,  params.cog_.header.frame_id, tf2::TimePointZero);
-  //     tf2::doTransform(params.cog_, cog_transformed, transform_cog);
-
-  //     measured_wrench_transformed.wrench.force.z += params.force_;
-  //     measured_wrench_transformed.wrench.torque.x += (params.force_ * cog_transformed.vector.y);
-  //     measured_wrench_transformed.wrench.torque.y -= (params.force_ * cog_transformed.vector.x);
-  //   }
-
-  //   tf2::doTransform(measured_wrench_transformed, measured_wrench_filtered_, transform_to_sensor);
-
-  // } catch (const tf2::TransformException & e) {
-  //   // TODO(destogl): Use RCLCPP_ERROR_THROTTLE
-  //   RCLCPP_ERROR(rclcpp::get_logger("AdmittanceRule"), "LookupTransform failed between '" + fixed_world_frame_ + "' and '" + measured_wrench_.header.frame_id + "' or '<a cog frame>'.");
-  //   // If transform error just use measured force
-  //   measured_wrench_filtered_ = measured_wrench_;
-  // }
+  filter_chain_->update(measured_wrench_, measured_wrench_filtered_);
 
   // TODO(andyz): This is not flexible to work in other control frames besides ik_base
   transform_message_to_ik_base_frame(measured_wrench_filtered_, measured_wrench_ik_base_frame_);
@@ -467,7 +409,10 @@ void AdmittanceRule::process_wrench_measurements(
 
   // TODO(destogl): optimize this checks!
   // If at least one measured force is nan set all to 0
-  if (std::find_if(measured_wrench_ik_base_frame_arr_.begin(), measured_wrench_ik_base_frame_arr_.end(), [](const auto value){ return std::isnan(value); }) != measured_wrench_ik_base_frame_arr_.end()) {
+  if (std::find_if(measured_wrench_ik_base_frame_arr_.begin(),
+    measured_wrench_ik_base_frame_arr_.end(),
+    [](const auto value){ return std::isnan(value); }) != measured_wrench_ik_base_frame_arr_.end())
+  {
     measured_wrench_ik_base_frame_arr_.fill(0.0);
   }
 
