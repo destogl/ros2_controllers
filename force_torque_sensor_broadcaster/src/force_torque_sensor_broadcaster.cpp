@@ -18,8 +18,12 @@
 
 #include "force_torque_sensor_broadcaster/force_torque_sensor_broadcaster.hpp"
 
+#include <limits>
 #include <memory>
 #include <string>
+
+#include "tf2/utils.h"
+#include "tf2_geometry_msgs/tf2_geometry_msgs.h"
 
 namespace force_torque_sensor_broadcaster
 {
@@ -45,6 +49,7 @@ ForceTorqueSensorBroadcaster::init(const std::string & controller_name)
     get_node()->declare_parameter<std::string>("interface_names.torque.y", "");
     get_node()->declare_parameter<std::string>("interface_names.torque.z", "");
     get_node()->declare_parameter<std::string>("frame_id", "");
+    get_node()->declare_parameter<std::vector<std::string>>("additional_frames_to_publish", {});
   } catch (const std::exception & e) {
     fprintf(stderr, "Exception thrown during init stage with message: %s \n", e.what());
     return controller_interface::return_type::ERROR;
@@ -100,7 +105,7 @@ CallbackReturn ForceTorqueSensorBroadcaster::on_configure(
 
   try {
     filter_chain_ =
-    std::make_unique<filters::FilterChain<geometry_msgs::msg::WrenchStamped>>(
+    std::make_unique<filters::FilterChain<WrenchMsgType>>(
       "geometry_msgs::msg::WrenchStamped");
   } catch (const std::exception & e) {
     fprintf(
@@ -121,12 +126,12 @@ CallbackReturn ForceTorqueSensorBroadcaster::on_configure(
 
   try {
     // register ft sensor data publishers
-    wrench_raw_pub_ = get_node()->create_publisher<geometry_msgs::msg::WrenchStamped>(
+    wrench_raw_pub_ = get_node()->create_publisher<WrenchMsgType>(
       "~/wrench", rclcpp::SystemDefaultsQoS());
-    wrench_raw_publisher_ = std::make_unique<WrenchPublisher>(wrench_raw_pub_);
-    wrench_filtered_pub_ = get_node()->create_publisher<geometry_msgs::msg::WrenchStamped>(
+    wrench_raw_publisher_ = std::make_unique<WrenchRTPublisher>(wrench_raw_pub_);
+    wrench_filtered_pub_ = get_node()->create_publisher<WrenchMsgType>(
       "~/wrench_filtered", rclcpp::SystemDefaultsQoS());
-    wrench_filtered_publisher_ = std::make_unique<WrenchPublisher>(wrench_filtered_pub_);
+    wrench_filtered_publisher_ = std::make_unique<WrenchRTPublisher>(wrench_filtered_pub_);
   } catch (const std::exception & e) {
     fprintf(
       stderr, "Exception thrown during publisher creation at configure stage with message : %s \n",
@@ -145,7 +150,31 @@ CallbackReturn ForceTorqueSensorBroadcaster::on_configure(
   wrench_filtered_publisher_->msg_.header.frame_id = frame_id_;
   wrench_filtered_publisher_->unlock();
 
-  RCLCPP_DEBUG(get_node()->get_logger(), "configure successful");
+  // Add additional frames to publish if any exits
+  additional_frames_to_publish_ =
+    get_node()->get_parameter("additional_frames_to_publish").as_string_array();
+
+  if (!additional_frames_to_publish_.empty()) {
+    auto nr_frames = additional_frames_to_publish_.size();
+    wrench_aditional_frames_pubs_.reserve(nr_frames);
+    wrench_aditional_frames_publishers_.reserve(nr_frames);
+    for (const auto & frame : additional_frames_to_publish_) {
+      WrenchPublisher pub = get_node()->create_publisher<WrenchMsgType>(
+        "~/wrench_filtered_" + frame, rclcpp::SystemDefaultsQoS());
+      wrench_aditional_frames_pubs_.emplace_back(pub);
+      wrench_aditional_frames_publishers_.emplace_back(std::make_unique<WrenchRTPublisher>(pub));
+
+      wrench_aditional_frames_publishers_.back()->lock();
+      wrench_aditional_frames_publishers_.back()->msg_.header.frame_id = frame;
+      wrench_aditional_frames_publishers_.back()->unlock();
+    }
+
+    // initialize buffer transforms
+    tf_buffer_ = std::make_shared<tf2_ros::Buffer>(get_node()->get_clock());
+    tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
+  }
+
+  RCLCPP_INFO(get_node()->get_logger(), "configure successful");
   return CallbackReturn::SUCCESS;
 }
 
@@ -202,6 +231,29 @@ controller_interface::return_type ForceTorqueSensorBroadcaster::update() {
     wrench_filtered_publisher_->msg_.header.frame_id = wrench_filtered_.header.frame_id;
     wrench_filtered_publisher_->msg_.wrench = wrench_filtered_.wrench;
     wrench_filtered_publisher_->unlockAndPublish();
+  }
+
+  for (const auto & publisher : wrench_aditional_frames_publishers_) {
+    try {
+      auto transform = tf_buffer_->lookupTransform(
+        publisher->msg_.header.frame_id, frame_id_, tf2::TimePointZero);
+      tf2::doTransform(wrench_filtered_, publisher->msg_, transform);
+
+      if (publisher && publisher->trylock()) {
+        publisher->msg_.header.stamp = wrench_raw_.header.stamp;
+        publisher->unlockAndPublish();
+      }
+    } catch (const tf2::TransformException & e) {
+      RCLCPP_ERROR_THROTTLE(rclcpp::get_logger("FTSBroadcaster"), *(get_node()->get_clock()), 5000,
+                            "LookupTransform failed from '" + frame_id_ + "' to '" +
+                            publisher->msg_.header.frame_id + "'.");
+      publisher->msg_.wrench.force.x = std::numeric_limits<double>::quiet_NaN();
+      publisher->msg_.wrench.force.y = std::numeric_limits<double>::quiet_NaN();
+      publisher->msg_.wrench.force.z = std::numeric_limits<double>::quiet_NaN();
+      publisher->msg_.wrench.torque.x = std::numeric_limits<double>::quiet_NaN();
+      publisher->msg_.wrench.torque.y = std::numeric_limits<double>::quiet_NaN();
+      publisher->msg_.wrench.torque.z = std::numeric_limits<double>::quiet_NaN();
+    }
   }
 
   return controller_interface::return_type::OK;
