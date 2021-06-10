@@ -171,9 +171,6 @@ controller_interface::return_type AdmittanceRule::configure(rclcpp::Node::Shared
   // Initialize variables used in the update loop
   measured_wrench_.header.frame_id = sensor_frame_;
 
-  relative_admittance_pose_.header.frame_id = control_frame_;
-  relative_admittance_pose_.child_frame_id = control_frame_;
-
   reference_joint_deltas_vec_.reserve(6);
   reference_deltas_vec_ik_base_.reserve(6);
   reference_deltas_ik_base_.header.frame_id = ik_base_frame_;
