@@ -212,20 +212,6 @@ controller_interface::return_type AdmittanceRule::reset()
     convert_message_to_array(admittance_pose_ik_base_frame_, admittance_pose_ik_base_frame_arr_);
   }
 
-  // Initialize ik_tip and tool_frame transformations - those are fixed transformations
-  tf2::Stamped<tf2::Transform> tf2_transform;
-  try {
-    auto transform = tf_buffer_->lookupTransform(ik_tip_frame_, control_frame_, tf2::TimePointZero);
-    tf2::fromMsg(transform, tf2_transform);
-    ik_tip_to_control_frame_tf_ = tf2_transform;
-    control_frame_to_ik_tip_tf_ = tf2_transform.inverse();
-  } catch (const tf2::TransformException & e) {
-    // TODO(destogl): Use RCLCPP_ERROR_THROTTLE
-    RCLCPP_ERROR(rclcpp::get_logger("AdmittanceRule"), "LookupTransform failed from '" +
-    control_frame_ + "' to '" + ik_tip_frame_ + "'.");
-    return controller_interface::return_type::ERROR;
-  }
-
   return controller_interface::return_type::OK;
 }
 
@@ -359,14 +345,14 @@ controller_interface::return_type AdmittanceRule::get_controller_state(
 
   // FIXME(destogl): Something is wrong with this transformation - check frames...
   try {
-    auto transform = tf_buffer_->lookupTransform(endeffector_frame_, control_frame_, tf2::TimePointZero);
-    tf2::doTransform(measured_wrench_ik_base_frame_, measured_wrench_endeffector_frame_, transform);
+    auto transform = tf_buffer_->lookupTransform(ik_base_frame_, control_frame_, tf2::TimePointZero);
+    tf2::doTransform(measured_wrench_ik_base_frame_, measured_wrench_control_frame_, transform);
   } catch (const tf2::TransformException & e) {
     // TODO(destogl): Use RCLCPP_ERROR_THROTTLE
     RCLCPP_ERROR(rclcpp::get_logger("AdmittanceRule"), "LookupTransform failed from '" +
-    control_frame_ + "' to '" + endeffector_frame_ + "'.");
+    ik_base_frame_ + "' to '" + control_frame_ + "'.");
   }
-  state_message.measured_wrench_endeffector_frame = measured_wrench_endeffector_frame_;
+  state_message.measured_wrench_endeffector_frame = measured_wrench_control_frame_;
 
   state_message.admittance_rule_calculated_values = admittance_rule_calculated_values_;
 

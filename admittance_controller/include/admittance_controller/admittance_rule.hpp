@@ -89,11 +89,8 @@ public:
   // IK related parameters
   // ik_base_frame should be stationary so vel/accel calculations are correct
   std::string ik_base_frame_;
-  std::string ik_tip_frame_;
   std::string ik_group_name_;
 
-  // Frame which position should be controlled
-  std::string endeffector_frame_;
   // Admittance calcs (displacement etc) are done in this frame. Usually the tool or end-effector
   std::string control_frame_;
   // Gravity points down (neg. Z) in the world frame
@@ -150,15 +147,12 @@ protected:
   std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
 
-  tf2::Transform ik_tip_to_control_frame_tf_;
-  tf2::Transform control_frame_to_ik_tip_tf_;
-
   // measured_wrench_ could arrive in any frame. It will be transformed
   geometry_msgs::msg::WrenchStamped measured_wrench_;
   geometry_msgs::msg::WrenchStamped measured_wrench_filtered_;
 
   geometry_msgs::msg::WrenchStamped measured_wrench_ik_base_frame_;
-  geometry_msgs::msg::WrenchStamped measured_wrench_endeffector_frame_;
+  geometry_msgs::msg::WrenchStamped measured_wrench_control_frame_;
 
   geometry_msgs::msg::PoseStamped current_pose_ik_base_frame_;
 

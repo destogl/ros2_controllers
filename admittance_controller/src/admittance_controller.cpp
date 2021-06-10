@@ -153,9 +153,7 @@ CallbackReturn AdmittanceController::on_configure(
     get_bool_param_and_error_if_empty(use_joint_commands_as_input_, "use_joint_commands_as_input") ||
     get_bool_param_and_error_if_empty(admittance_->open_loop_control_, "open_loop_control") ||
     get_string_param_and_error_if_empty(admittance_->ik_base_frame_, "IK.base") ||
-    get_string_param_and_error_if_empty(admittance_->ik_tip_frame_, "IK.tip") ||
     get_string_param_and_error_if_empty(admittance_->ik_group_name_, "IK.group_name") ||
-    get_string_param_and_error_if_empty(admittance_->endeffector_frame_, "endeffector_frame") ||
     get_string_param_and_error_if_empty(admittance_->control_frame_, "control_frame") ||
     get_string_param_and_error_if_empty(admittance_->fixed_world_frame_, "fixed_world_frame") ||
     get_string_param_and_error_if_empty(admittance_->sensor_frame_, "sensor_frame") ||

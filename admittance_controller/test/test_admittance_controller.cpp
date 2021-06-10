@@ -211,7 +211,6 @@ TEST_F(AdmittanceControllerTest, all_parameters_set_configure_success)
 
   ASSERT_EQ(controller_->ft_sensor_name_, ft_sensor_name_);
   ASSERT_EQ(controller_->admittance_->ik_base_frame_, ik_base_frame_);
-  ASSERT_EQ(controller_->admittance_->ik_tip_frame_, ik_tip_frame_);
   //   ASSERT_EQ(controller_->admittance_->ik_group_name_, ik_group_name_);
   ASSERT_EQ(controller_->admittance_->fixed_world_frame_, fixed_world_frame_);
   ASSERT_EQ(controller_->admittance_->sensor_frame_, sensor_frame_);
