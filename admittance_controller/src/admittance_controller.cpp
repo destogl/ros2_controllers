@@ -325,21 +325,6 @@ CallbackReturn AdmittanceController::on_configure(
   // Configure AdmittanceRule
   admittance_->configure(get_node());
 
-  // wait for TF to become available. Important to do there because it is blocking, i.e. non real-time safe code
-  std::shared_ptr<ControllerCommandPoseMsg> msg_pose = std::make_shared<ControllerCommandPoseMsg>();
-  // TODO(destogl): This will break tests because there is no TF inside them
-  auto iterations = 0u;
-  const auto max_iterations = 20u;
-  while (admittance_->get_pose_of_control_frame_in_base_frame(*msg_pose) != controller_interface::return_type::OK)
-  {
-    RCLCPP_INFO_THROTTLE(get_node()->get_logger(), *(get_node()->get_clock()), 5000, "Waiting for base to control frame transform to become available.");
-    rclcpp::sleep_for(std::chrono::seconds(1));
-    if (++iterations > max_iterations) {
-      RCLCPP_ERROR(get_node()->get_logger(), "After waiting for TF for %zu seconds, still no transformation available. Admittance Controller can not be configured.", max_iterations);
-      return CallbackReturn::ERROR;
-    }
-  }
-
   // TODO(destogl): Use reserve instead of resize?
   last_commanded_state_.positions.resize(num_joints);
   last_commanded_state_.velocities.resize(num_joints, 0.0);
@@ -454,7 +439,14 @@ CallbackReturn AdmittanceController::on_activate(const rclcpp_lifecycle::State &
 
   std::shared_ptr<ControllerCommandPoseMsg> msg_pose = std::make_shared<ControllerCommandPoseMsg>();
   msg_pose->header.frame_id = admittance_->control_frame_;
-  admittance_->get_pose_of_control_frame_in_base_frame(*msg_pose);
+  if (admittance_->get_pose_of_control_frame_in_base_frame(*msg_pose) !=
+      controller_interface::return_type::OK)
+  {
+    RCLCPP_ERROR(node_->get_logger(),
+                 "Can not find transform from '%s' to '%s' needed in the update loop",
+                 admittance_->ik_base_frame_, admittance_->control_frame_);
+    return rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn::ERROR;
+  }
   input_pose_command_.writeFromNonRT(msg_pose);
 
   return CallbackReturn::SUCCESS;
