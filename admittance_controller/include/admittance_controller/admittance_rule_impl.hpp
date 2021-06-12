@@ -201,7 +201,7 @@ controller_interface::return_type AdmittanceRule::reset()
   reference_pose_ik_base_frame_arr_.fill(0.0);
   current_pose_ik_base_frame_arr_.fill(0.0);
   admittance_velocity_arr_.fill(0.0);
-  sum_of_admittance_displacements_.fill(0.0);
+  sum_of_admittance_displacements_arr_.fill(0.0);
 
   get_pose_of_control_frame_in_base_frame(current_pose_ik_base_frame_);
   reference_pose_from_joint_deltas_ik_base_frame_ = current_pose_ik_base_frame_;
@@ -239,39 +239,54 @@ controller_interface::return_type AdmittanceRule::update(
 )
 {
   // Convert inputs to ik_base frame (assumed stationary)
-  transform_message_to_ik_base_frame(reference_pose, reference_pose_ik_base_frame_);
+  transform_to_ik_base_frame(reference_pose, reference_pose_ik_base_frame_);
+
+  std::array<double, 6> pose_error;
 
   if (!open_loop_control_) {
     get_pose_of_control_frame_in_base_frame(current_pose_ik_base_frame_);
+
+    // Convert all data to arrays for simpler calculation
+    //   transform_to_control_frame(reference_pose_ik_base_frame_, reference_pose_ik_base_frame_);
+    convert_message_to_array(reference_pose_ik_base_frame_, reference_pose_ik_base_frame_arr_);
+    //   transform_to_control_frame(current_pose_ik_base_frame_, current_pose_ik_base_frame_);
+    convert_message_to_array(current_pose_ik_base_frame_, current_pose_ik_base_frame_arr_);
+
+    for (auto i = 0u; i < 6; ++i) {
+      pose_error[i] = current_pose_ik_base_frame_arr_[i] - reference_pose_ik_base_frame_arr_[i];
+
+      if (i >= 3) {
+        pose_error[i] = angles::normalize_angle(pose_error[i]);
+      }
+      if (std::fabs(pose_error[i]) < POSE_ERROR_EPSILON) {
+        pose_error[i] = 0.0;
+      }
+    }
+
   } else {
     // In open-loop mode, assume the user's requested pose was exactly achieved
     // TODO(destogl): This will maybe now work when no feed-forward is used
     current_pose_ik_base_frame_ = reference_pose_ik_base_frame_;
-  }
 
-  // Convert all data to arrays for simpler calculation
-  convert_message_to_array(reference_pose_ik_base_frame_, reference_pose_ik_base_frame_arr_);
-  convert_message_to_array(current_pose_ik_base_frame_, current_pose_ik_base_frame_arr_);
+    for (auto i = 0u; i < 6; ++i) {
+      // Sum admittance displacements (in ik_base_frame) from the previous relative poses
+      sum_of_admittance_displacements_arr_[i] += relative_admittance_pose_arr_[i];
 
-  std::array<double, 6> pose_error;
-
-  for (auto i = 0u; i < 6; ++i) {
-
-    if (!open_loop_control_) {
-      pose_error[i] = current_pose_ik_base_frame_arr_[i] - reference_pose_ik_base_frame_arr_[i];
-    } else {
-      // Sum admittance displacement from the previous relative poses
-      sum_of_admittance_displacements_[i] += relative_admittance_pose_arr_[i];
-      // In open-loop mode, spring force is related to the accumulated "admittance displacement"
-      pose_error[i] = sum_of_admittance_displacements_[i];
+      if (i >= 3) {
+        sum_of_admittance_displacements_arr_[i] = angles::normalize_angle(sum_of_admittance_displacements_arr_[i]);
+      }
+      if (std::fabs(sum_of_admittance_displacements_arr_[i]) < POSE_ERROR_EPSILON) {
+        sum_of_admittance_displacements_arr_[i] = 0.0;
+      }
     }
 
-    if (i >= 3) {
-      pose_error[i] = angles::normalize_angle(pose_error[i]);
-    }
-    if (std::fabs(pose_error[i]) < POSE_ERROR_EPSILON) {
-      pose_error[i] = 0.0;
-    }
+    // Convert admittance displacements to control_frame_
+    //     convert_array_to_message(sum_of_admittance_displacements_arr_, sum_of_admittance_displacements_);
+    //     transform_to_control_frame(sum_of_admittance_displacements_, sum_of_admittance_displacements_);
+    //     convert_message_to_array(sum_of_admittance_displacements_, sum_of_admittance_displacements_arr_);
+
+    // In open-loop mode, spring force is related to the accumulated "admittance displacement"
+    pose_error = sum_of_admittance_displacements_arr_;
   }
 
   process_wrench_measurements(measured_wrench);
@@ -283,10 +298,15 @@ controller_interface::return_type AdmittanceRule::update(
   // Do clean conversion to the goal pose using transform and not messing with Euler angles
   convert_array_to_message(relative_admittance_pose_arr_, relative_admittance_pose_);
 
+  // Store relative admittance pose array in ik_base_frame between control loops and for IK
+//   transform_to_ik_base_frame(relative_admittance_pose_, relative_admittance_pose_);
+//   convert_message_to_array(relative_admittance_pose_, relative_admittance_pose_arr_);
+
   // Add deltas to previously-desired pose to get the next desired pose
   tf2::doTransform(current_pose_ik_base_frame_, admittance_pose_ik_base_frame_, relative_admittance_pose_);
 
-  return calculate_desired_joint_state(current_joint_state, period, desired_joint_state);
+  return calculate_desired_joint_state(current_joint_state, relative_admittance_pose_arr_,
+                                       period, desired_joint_state);
 }
 
 // Update from target joint deltas
@@ -401,8 +421,9 @@ void AdmittanceRule::process_wrench_measurements(
   measured_wrench_.wrench = measured_wrench;
   filter_chain_->update(measured_wrench_, measured_wrench_filtered_);
 
-  // TODO(andyz): This is not flexible to work in other control frames besides ik_base
-  transform_message_to_ik_base_frame(measured_wrench_filtered_, measured_wrench_ik_base_frame_);
+  // TODO(destogl): rename this variables...
+  transform_to_ik_base_frame(measured_wrench_filtered_, measured_wrench_ik_base_frame_);
+//   transform_to_control_frame(measured_wrench_filtered_, measured_wrench_ik_base_frame_);
   convert_message_to_array(measured_wrench_ik_base_frame_, measured_wrench_ik_base_frame_arr_);
 
   // TODO(destogl): optimize this checks!
@@ -456,17 +477,16 @@ void AdmittanceRule::calculate_admittance_rule(
 
 controller_interface::return_type AdmittanceRule::calculate_desired_joint_state(
   const trajectory_msgs::msg::JointTrajectoryPoint & current_joint_state,
+  const std::array<double, 6> & relative_pose,
   const rclcpp::Duration & period,
   trajectory_msgs::msg::JointTrajectoryPoint & desired_joint_state
 )
 {
-  convert_array_to_message(relative_admittance_pose_arr_, relative_admittance_pose_);
-
   // Since ik_base is MoveIt's working frame, the transform is identity.
   identity_transform_.header.frame_id = ik_base_frame_;
 
   // Use Jacobian-based IK
-  std::vector<double> relative_admittance_pose_vec(relative_admittance_pose_arr_.begin(), relative_admittance_pose_arr_.end());
+  std::vector<double> relative_admittance_pose_vec(relative_pose.begin(), relative_pose.end());
   ik_->update_robot_state(current_joint_state);
   if (ik_->convert_cartesian_deltas_to_joint_deltas(
     relative_admittance_pose_vec, identity_transform_, relative_desired_joint_state_vec_)){

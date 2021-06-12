@@ -143,6 +143,7 @@ protected:
 
   controller_interface::return_type calculate_desired_joint_state(
     const trajectory_msgs::msg::JointTrajectoryPoint & current_joint_state,
+    const std::array<double, 6> & relative_pose,
     const rclcpp::Duration & period,
     trajectory_msgs::msg::JointTrajectoryPoint & desired_joint_state
   );
@@ -180,6 +181,7 @@ protected:
 
   geometry_msgs::msg::PoseStamped admittance_pose_ik_base_frame_;
   geometry_msgs::msg::TransformStamped relative_admittance_pose_;
+  geometry_msgs::msg::TransformStamped sum_of_admittance_displacements_;
 
   // Joint deltas calculation variables
   std::vector<double> reference_joint_deltas_vec_;
@@ -197,7 +199,7 @@ protected:
   std::array<double, 6> admittance_pose_ik_base_frame_arr_;
   std::array<double, 6> admittance_velocity_arr_;
   // Keep a running tally of motion due to admittance, to calculate spring force in open-loop mode
-  std::array<double, 6> sum_of_admittance_displacements_;
+  std::array<double, 6> sum_of_admittance_displacements_arr_;
 
   std::vector<double> relative_desired_joint_state_vec_;
 
@@ -210,12 +212,26 @@ protected:
 private:
   template<typename MsgType>
   controller_interface::return_type
-  transform_message_to_ik_base_frame(const MsgType & message_in, MsgType & message_out)
+  transform_to_control_frame(const MsgType & message_in, MsgType & message_out)
   {
-    if (ik_base_frame_ != message_in.header.frame_id) {
+    return transform_to_frame(message_in, message_out, control_frame_);
+  }
+
+  template<typename MsgType>
+  controller_interface::return_type
+  transform_to_ik_base_frame(const MsgType & message_in, MsgType & message_out)
+  {
+    return transform_to_frame(message_in, message_out, ik_base_frame_);
+  }
+
+  template<typename MsgType>
+  controller_interface::return_type
+  transform_to_frame(const MsgType & message_in, MsgType & message_out, const std::string & frame)
+  {
+    if (frame != message_in.header.frame_id) {
       try {
         geometry_msgs::msg::TransformStamped transform = tf_buffer_->lookupTransform(
-          ik_base_frame_, message_in.header.frame_id, tf2::TimePointZero);
+          frame, message_in.header.frame_id, tf2::TimePointZero);
         tf2::doTransform(message_in, message_out, transform);
       } catch (const tf2::TransformException & e) {
         RCLCPP_ERROR_SKIPFIRST_THROTTLE(
@@ -238,17 +254,6 @@ private:
     tf2::fromMsg(input, input_tf);
     output_tf = input_tf * transform;
     tf2::toMsg(output_tf, output);
-  }
-
-  // TODO(destogl): As of C++17 use transform_reduce:
-  // https://stackoverflow.com/questions/58266717/accumulate-absolute-values-of-a-vector
-  template<typename Type>
-  double accumulate_absolute(const Type & container) {
-    double accumulator = 0.0;
-    for (auto i = 0ul; i < container.size(); i++) {
-      accumulator += std::fabs(container[i]);
-    }
-    return accumulator;
   }
 };
 
