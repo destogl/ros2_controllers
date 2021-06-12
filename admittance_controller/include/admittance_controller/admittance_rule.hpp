@@ -79,6 +79,18 @@ public:
 
   controller_interface::return_type get_pose_of_control_frame_in_base_frame(geometry_msgs::msg::PoseStamped & pose);
 
+  /**
+   * Conversion to damping when damping_ratio (zeta) parameter is used.
+   * Using formula: D = damping_ratio * 2 * sqrt( M * S )
+   */
+  void convert_damping_ratio_to_damping() {
+    for (auto i = 0ul; i < damping_ratio_.size(); ++i) {
+      if (!std::isnan(damping_ratio_[i])) {
+        damping_[i] = damping_ratio_[i] * 2 * sqrt(mass_[i] * stiffness_[i]);
+      }
+    }
+  }
+
 public:
   bool open_loop_control_ = false;
   // TODO(destogl): Add parameter for this
@@ -108,6 +120,7 @@ public:
   std::array<bool, 6> selected_axes_;
   std::array<double, 6> mass_;
   std::array<double, 6> damping_;
+  std::array<double, 6> damping_ratio_;
   std::array<double, 6> stiffness_;
 
   // Filter chain for Wrench data
