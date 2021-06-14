@@ -224,6 +224,7 @@ CallbackReturn AdmittanceController::on_configure(
     return CallbackReturn::ERROR;
   }
 
+  // Convert the damping ratio (if given) to mass/spring/damper representation
   admittance_->convert_damping_ratio_to_damping();
 
   try {
@@ -358,7 +359,6 @@ CallbackReturn AdmittanceController::on_configure(
   // Configure AdmittanceRule
   admittance_->configure(get_node());
 
-  // TODO(destogl): Use reserve instead of resize?
   last_commanded_state_.positions.resize(num_joints);
   last_commanded_state_.velocities.resize(num_joints, 0.0);
   last_commanded_state_.accelerations.resize(num_joints, 0.0);
