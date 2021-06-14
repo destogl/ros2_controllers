@@ -165,7 +165,8 @@ namespace admittance_controller
 
 controller_interface::return_type AdmittanceRule::configure(rclcpp::Node::SharedPtr node)
 {
-  tf_buffer_ = std::make_shared<tf2_ros::Buffer>(node->get_clock());
+  clock_ = node->get_clock();
+  tf_buffer_ = std::make_shared<tf2_ros::Buffer>(clock_);
   tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 
   // Initialize variables used in the update loop
@@ -220,9 +221,8 @@ controller_interface::return_type AdmittanceRule::reset()
     ik_tip_to_control_frame_tf_ = tf2_transform;
     control_frame_to_ik_tip_tf_ = tf2_transform.inverse();
   } catch (const tf2::TransformException & e) {
-    // TODO(destogl): Use RCLCPP_ERROR_THROTTLE
-    RCLCPP_ERROR(rclcpp::get_logger("AdmittanceRule"), "LookupTransform failed from '" +
-    control_frame_ + "' to '" + ik_tip_frame_ + "'.");
+    RCLCPP_ERROR_SKIPFIRST_THROTTLE(
+      rclcpp::get_logger("AdmittanceRule"), *clock_, 5000, "%s", e.what());
     return controller_interface::return_type::ERROR;
   }
 
@@ -362,9 +362,8 @@ controller_interface::return_type AdmittanceRule::get_controller_state(
     auto transform = tf_buffer_->lookupTransform(endeffector_frame_, control_frame_, tf2::TimePointZero);
     tf2::doTransform(measured_wrench_ik_base_frame_, measured_wrench_endeffector_frame_, transform);
   } catch (const tf2::TransformException & e) {
-    // TODO(destogl): Use RCLCPP_ERROR_THROTTLE
-    RCLCPP_ERROR(rclcpp::get_logger("AdmittanceRule"), "LookupTransform failed from '" +
-    control_frame_ + "' to '" + endeffector_frame_ + "'.");
+    RCLCPP_ERROR_SKIPFIRST_THROTTLE(
+      rclcpp::get_logger("AdmittanceRule"), *clock_, 5000, "%s", e.what());
   }
   state_message.measured_wrench_endeffector_frame = measured_wrench_endeffector_frame_;
 
@@ -388,9 +387,8 @@ controller_interface::return_type AdmittanceRule::get_pose_of_control_frame_in_b
     pose.pose.position.z = transform.transform.translation.z;
     pose.pose.orientation= transform.transform.rotation;
   } catch (const tf2::TransformException & e) {
-    // TODO(destogl): Use RCLCPP_ERROR_THROTTLE
-    RCLCPP_ERROR(rclcpp::get_logger("AdmittanceRule"), "LookupTransform failed from '" +
-    control_frame_ + "' to '" + ik_base_frame_ + "'.");
+    RCLCPP_ERROR_SKIPFIRST_THROTTLE(
+      rclcpp::get_logger("AdmittanceRule"), *clock_, 5000, "%s", e.what());
     return controller_interface::return_type::ERROR;
   }
   return controller_interface::return_type::OK;

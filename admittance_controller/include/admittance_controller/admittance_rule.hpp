@@ -25,8 +25,6 @@
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "geometry_msgs/msg/transform_stamped.hpp"
 #include "geometry_msgs/msg/wrench_stamped.hpp"
-// TODO(destogl): Enable use of filters
-// #include "iirob_filters/gravity_compensation.h"
 #include "tf2_ros/transform_listener.h"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.h"
 
@@ -81,6 +79,18 @@ public:
 
   controller_interface::return_type get_pose_of_control_frame_in_base_frame(geometry_msgs::msg::PoseStamped & pose);
 
+  /**
+   * Conversion to damping when damping_ratio (zeta) parameter is used.
+   * Using formula: D = damping_ratio * 2 * sqrt( M * S )
+   */
+  void convert_damping_ratio_to_damping() {
+    for (auto i = 0ul; i < damping_ratio_.size(); ++i) {
+      if (!std::isnan(damping_ratio_[i])) {
+        damping_[i] = damping_ratio_[i] * 2 * sqrt(mass_[i] * stiffness_[i]);
+      }
+    }
+  }
+
 public:
   bool open_loop_control_ = false;
   // TODO(destogl): Add parameter for this
@@ -110,6 +120,7 @@ public:
   std::array<bool, 6> selected_axes_;
   std::array<double, 6> mass_;
   std::array<double, 6> damping_;
+  std::array<double, 6> damping_ratio_;
   std::array<double, 6> stiffness_;
 
   // Filter chain for Wrench data
@@ -139,12 +150,8 @@ protected:
   // IK variables
   std::shared_ptr<MoveItKinematics> ik_;
 
-  // Filters
-//   using GravityCompensatorType =
-//     iirob_filters::GravityCompensator<geometry_msgs::msg::WrenchStamped>;
-//
-//   std::unique_ptr<GravityCompensatorType> wrist_gravity_compensator_;
-//   std::unique_ptr<GravityCompensatorType> tool_gravity_compensator_;
+  // Clock
+  rclcpp::Clock::SharedPtr clock_;
 
   // Transformation variables
   std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
@@ -211,9 +218,8 @@ private:
           ik_base_frame_, message_in.header.frame_id, tf2::TimePointZero);
         tf2::doTransform(message_in, message_out, transform);
       } catch (const tf2::TransformException & e) {
-        // TODO(destogl): Use RCLCPP_ERROR_THROTTLE
-        RCLCPP_ERROR(rclcpp::get_logger("AdmittanceRule"), "LookupTransform failed from '" +
-        message_in.header.frame_id + "' to '" + ik_base_frame_ + "'.");
+        RCLCPP_ERROR_SKIPFIRST_THROTTLE(
+          rclcpp::get_logger("AdmittanceRule"), *clock_, 5000, "%s", e.what());
         return controller_interface::return_type::ERROR;
       }
     } else {
