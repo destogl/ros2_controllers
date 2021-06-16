@@ -74,9 +74,11 @@ bool MoveItKinematics::convert_cartesian_deltas_to_joint_deltas(
 
   // Multiply with the pseudoinverse to get delta_theta
   jacobian_ = kinematic_state_->getJacobian(joint_model_group_);
-  // TODO(andyz): the SVD method would be more stable near singularities
-  // (or do what Olivier suggested: https://github.com/ros-controls/ros2_controllers/pull/173#discussion_r627936628)
-  pseudo_inverse_ = jacobian_.transpose() * (jacobian_ * jacobian_.transpose()).inverse();
+  // TODO(andyz): consider what Olivier suggested: https://github.com/ros-controls/ros2_controllers/pull/173#discussion_r627936628
+  svd_ = Eigen::JacobiSVD<Eigen::MatrixXd>(jacobian_, Eigen::ComputeThinU | Eigen::ComputeThinV);
+  matrix_s_ = svd_.singularValues().asDiagonal();
+  pseudo_inverse_ = svd_.matrixV() * matrix_s_.inverse() * svd_.matrixU().transpose();
+
   Eigen::VectorXd  delta_theta = pseudo_inverse_ * delta_x;
 
   std::vector<double> delta_theta_v(&delta_theta[0], delta_theta.data() + delta_theta.cols() * delta_theta.rows());

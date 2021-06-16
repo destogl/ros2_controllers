@@ -87,6 +87,8 @@ private:
 
   // Pre-allocate for speed
   Eigen::MatrixXd jacobian_;
+  Eigen::JacobiSVD<Eigen::MatrixXd> svd_;
+  Eigen::MatrixXd matrix_s_;
   Eigen::MatrixXd pseudo_inverse_;
 };
 
