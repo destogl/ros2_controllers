@@ -623,26 +623,28 @@ controller_interface::return_type AdmittanceController::update()
             break;
         }
       }
+    }
+  }
 
-      if (position_limit_triggered && !joint_mode_) {
-        // In Cartesian admittance mode, stop all joints if one would exceed limit
-          for (auto index = 0u; index < num_joints; ++index) {
-            // Compute accel to stop
-            // Here we aren't explicitly maximally decelerating, but for joints near their limits this should still result in max decel being used
-            double accel_limit = get_node()->get_parameter("joint_limits." + joint_state_interface_[0][index].get().get_name() + ".max_acceleration").get_value<double>();
-            double accel_to_stop = -current_joint_states.velocities[index] / duration_since_last_call.seconds();
-            double limited_accel = copysign(std::min(std::abs(accel_to_stop), accel_limit), accel_to_stop);
+  if (position_limit_triggered && !joint_mode_) {
+    // In Cartesian admittance mode, stop all joints if one would exceed limit
+    for (auto index = 0u; index < num_joints; ++index) {
+      if(get_node()->get_parameter("joint_limits." + joint_state_interface_[0][index].get().get_name() + ".has_acceleration_limits").get_value<bool>()) {
+        // Compute accel to stop
+        // Here we aren't explicitly maximally decelerating, but for joints near their limits this should still result in max decel being used
+        double accel_limit = get_node()->get_parameter("joint_limits." + joint_state_interface_[0][index].get().get_name() + ".max_acceleration").get_value<double>();
+        double accel_to_stop = -current_joint_states.velocities[index] / duration_since_last_call.seconds();
+        double limited_accel = copysign(std::min(std::abs(accel_to_stop), accel_limit), accel_to_stop);
 
-            desired_joint_states.velocities[index] = current_joint_states.velocities[index] + limited_accel * duration_since_last_call.seconds();
-            // Recompute position
-            desired_joint_states.positions[index] = current_joint_states.positions[index] + current_joint_states.velocities[index] * duration_since_last_call.seconds() + 0.5 * limited_accel * duration_since_last_call.seconds() * duration_since_last_call.seconds();
-        }
+        desired_joint_states.velocities[index] = current_joint_states.velocities[index] + limited_accel * duration_since_last_call.seconds();
+        // Recompute position
+        desired_joint_states.positions[index] = current_joint_states.positions[index] + current_joint_states.velocities[index] * duration_since_last_call.seconds() + 0.5 * limited_accel * duration_since_last_call.seconds() * duration_since_last_call.seconds();
       }
     }
   }
 
   if (position_limit_triggered) {
-    RCLCPP_ERROR_THROTTLE(get_node()->get_logger(), *get_node()->get_clock(), 1000, "Joint(s) approaching position limits in admittance controller, slowing");
+    RCLCPP_ERROR_THROTTLE(get_node()->get_logger(), *get_node()->get_clock(), 1000, "Joint(s) would exceed position limits in admittance controller, limiting");
   }
 
   // Write new joint angles to the robot
