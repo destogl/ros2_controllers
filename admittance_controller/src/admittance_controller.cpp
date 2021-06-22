@@ -568,6 +568,9 @@ controller_interface::return_type AdmittanceController::update()
       double vel_limit = get_node()->get_parameter("joint_limits." + joint_state_interface_[0][index].get().get_name() + ".max_velocity").get_value<double>();
       if(std::abs(desired_joint_states.velocities[index]) > vel_limit) {
         desired_joint_states.velocities[index] = copysign(vel_limit, desired_joint_states.velocities[index]);
+        double accel = (desired_joint_states.velocities[index] - current_joint_states.velocities[index]) / duration_since_last_call.seconds();
+        // Recompute position
+        desired_joint_states.positions[index] = current_joint_states.positions[index] + current_joint_states.velocities[index] * duration_since_last_call.seconds() + 0.5 * accel * duration_since_last_call.seconds() * duration_since_last_call.seconds();
       }
     }
   }
@@ -579,54 +582,62 @@ controller_interface::return_type AdmittanceController::update()
       double accel = (desired_joint_states.velocities[index] - current_joint_states.velocities[index]) / duration_since_last_call.seconds();
       if(std::abs(accel) > accel_limit) {
         desired_joint_states.velocities[index] = current_joint_states.velocities[index] + copysign(accel_limit, desired_joint_states.velocities[index]) * duration_since_last_call.seconds();
+        // Recompute position
+        desired_joint_states.positions[index] = current_joint_states.positions[index] + current_joint_states.velocities[index] * duration_since_last_call.seconds() + 0.5 * accel * duration_since_last_call.seconds() * duration_since_last_call.seconds();
       }
     }
   }
 
-  // Check if desired_joint_states are at/beyond any position limits
-  // - In joint mode, slow down only joints that are at/beyond limits, at maximum speed
-  // - In Cartesian mode, slow down all joints at maximum speed if any are at/beyond limit
+  // TODO: Remove when param is added in
+  bool joint_mode_ = true;
+
+  // Check that joint limits are within stopping distance
+  // - In joint mode, slow down only joints that aren't within stopping_distance of limit, at maximum decel
+  // - In Cartesian mode, slow down all joints at maximum decel if any aren't within stopping_distance of limit
   bool position_limit_triggered = false;
   for (auto index = 0u; index < num_joints; ++index) {
-    // TODO: Find a better solution for retrieving limits
-    double lower = get_node()->get_parameter("joint_limits." + joint_state_interface_[0][index].get().get_name() + ".lower_position").get_value<double>();
-    double upper = get_node()->get_parameter("joint_limits." + joint_state_interface_[0][index].get().get_name() + ".upper_position").get_value<double>();
+    if(get_node()->get_parameter("joint_limits." + joint_state_interface_[0][index].get().get_name() + ".has_acceleration_limits").get_value<bool>()) {
+      // TODO: Handle URDFs where no acc limit is provided
 
-    if (desired_joint_states.positions[index] <= lower || desired_joint_states.positions[index] >= upper) {
-      position_limit_triggered = true;
+      // TODO: Find a better solution for retrieving limits
+      double lower = get_node()->get_parameter("joint_limits." + joint_state_interface_[0][index].get().get_name() + ".lower_position").get_value<double>();
+      double upper = get_node()->get_parameter("joint_limits." + joint_state_interface_[0][index].get().get_name() + ".upper_position").get_value<double>();
+      double accel_limit = get_node()->get_parameter("joint_limits." + joint_state_interface_[0][index].get().get_name() + ".max_acceleration").get_value<double>();
 
-      if (use_joint_commands_as_input_) {
-        // Slow down joint movement towards joint limit
-        desired_joint_states.positions[index] = current_joint_states.positions[index];
-        desired_joint_states.velocities[index] = 0.0;
+      // delta_x = (v2*v2 - v1*v1) / (2*a)
+      // stopping_distance = (- v1*v1) / (2*accel_limit)
+      // Here we assume we will not trigger velocity limits while maximally decelerating. This is a valid assumption if we are not currently at a velocity limit since we are just coming to a rest.
+      double stopping_distance = (- desired_joint_states.velocities[index] * desired_joint_states.velocities[index]) / (2 * accel_limit);
+      // Check that joint limits are beyond stopping_distance
+      if(upper - current_joint_states.positions[index] < stopping_distance || current_joint_states.positions[index] - lower < stopping_distance) {
+        position_limit_triggered = true;
 
-        // TODO: Instead of above state requiring infinite acceleration, compute maximum slowdown while obeying vel+acc limits
-        // 1. Compute acc required for joint to stop at t+1
-        // 2. Apply acc limit and compute v at t+1
-        // 3. Apply vel limit (and recompute a if necessary)
-        // 4. Recompute pos at t+1
-        // 5. Sanity check
-
-      } else {
-        // We will limit all joints
-        break;
+        if(joint_mode_) {
+          // Apply maximum acceleration away from joint limit
+          double accel_sign = (upper - current_joint_states.positions[index] < stopping_distance) ? -1.0 : 1.0;
+          desired_joint_states.velocities[index] = current_joint_states.velocities[index] + copysign(accel_limit, accel_sign) * duration_since_last_call.seconds();
+          // Recompute position
+          desired_joint_states.positions[index] = current_joint_states.positions[index] + current_joint_states.velocities[index] * duration_since_last_call.seconds() + 0.5 * copysign(accel_limit, accel_sign) * duration_since_last_call.seconds() * duration_since_last_call.seconds();
+        } else {
+            // We will limit all joints
+            break;
+        }
       }
-    }
-  }
 
-  if (position_limit_triggered && !use_joint_commands_as_input_) {
-    // In Cartesian admittance mode, stop all joints if one would exceed limit
-      for (auto index = 0u; index < num_joints; ++index) {
-        // Slow down joint movement towards joint limit
-        desired_joint_states.positions[index] = current_joint_states.positions[index];
-        desired_joint_states.velocities[index] = 0.0;
+      if (position_limit_triggered && !joint_mode_) {
+        // In Cartesian admittance mode, stop all joints if one would exceed limit
+          for (auto index = 0u; index < num_joints; ++index) {
+            // Compute accel to stop
+            // Here we aren't explicitly maximally decelerating, but for joints near their limits this should still result in max decel being used
+            double accel_limit = get_node()->get_parameter("joint_limits." + joint_state_interface_[0][index].get().get_name() + ".max_acceleration").get_value<double>();
+            double accel_to_stop = -current_joint_states.velocities[index] / duration_since_last_call.seconds();
+            double limited_accel = copysign(std::min(std::abs(accel_to_stop), accel_limit), accel_to_stop);
 
-        // TODO: Instead of above state requiring infinite acceleration, compute maximum slowdown while obeying vel+acc limits
-        // 1. Compute acc required for joint to stop at t+1
-        // 2. Apply acc limit and compute v at t+1
-        // 3. Apply vel limit (and recompute a if necessary)
-        // 4. Recompute pos at t+1
-        // 5. Sanity check
+            desired_joint_states.velocities[index] = current_joint_states.velocities[index] + limited_accel * duration_since_last_call.seconds();
+            // Recompute position
+            desired_joint_states.positions[index] = current_joint_states.positions[index] + current_joint_states.velocities[index] * duration_since_last_call.seconds() + 0.5 * limited_accel * duration_since_last_call.seconds() * duration_since_last_call.seconds();
+        }
+      }
     }
   }
 
