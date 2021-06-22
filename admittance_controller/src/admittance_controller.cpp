@@ -591,9 +591,9 @@ controller_interface::return_type AdmittanceController::update()
   // TODO: Remove when param is added in
   bool joint_mode_ = true;
 
-  // Check that joint limits are within stopping distance
-  // - In joint mode, slow down only joints that aren't within stopping_distance of limit, at maximum decel
-  // - In Cartesian mode, slow down all joints at maximum decel if any aren't within stopping_distance of limit
+  // Check that stopping distance is within joint limits
+  // - In joint mode, slow down only joints whose stopping distance isn't inside joint limits, at maximum decel
+  // - In Cartesian mode, slow down all joints at maximum decel if any don't have stopping distance within joint limits
   bool position_limit_triggered = false;
   for (auto index = 0u; index < num_joints; ++index) {
     if(get_node()->get_parameter("joint_limits." + joint_state_interface_[0][index].get().get_name() + ".has_acceleration_limits").get_value<bool>()) {
@@ -607,7 +607,7 @@ controller_interface::return_type AdmittanceController::update()
       // delta_x = (v2*v2 - v1*v1) / (2*a)
       // stopping_distance = (- v1*v1) / (2*accel_limit)
       // Here we assume we will not trigger velocity limits while maximally decelerating. This is a valid assumption if we are not currently at a velocity limit since we are just coming to a rest.
-      double stopping_distance = (- desired_joint_states.velocities[index] * desired_joint_states.velocities[index]) / (2 * accel_limit);
+      double stopping_distance = std::abs((- desired_joint_states.velocities[index] * desired_joint_states.velocities[index]) / (2 * accel_limit));
       // Check that joint limits are beyond stopping_distance
       if(upper - current_joint_states.positions[index] < stopping_distance || current_joint_states.positions[index] - lower < stopping_distance) {
         position_limit_triggered = true;
