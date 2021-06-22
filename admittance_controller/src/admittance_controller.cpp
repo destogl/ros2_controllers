@@ -581,9 +581,9 @@ controller_interface::return_type AdmittanceController::update()
       double accel_limit = get_node()->get_parameter("joint_limits." + joint_state_interface_[0][index].get().get_name() + ".max_acceleration").get_value<double>();
       double accel = (desired_joint_states.velocities[index] - current_joint_states.velocities[index]) / duration_since_last_call.seconds();
       if(std::abs(accel) > accel_limit) {
-        desired_joint_states.velocities[index] = current_joint_states.velocities[index] + copysign(accel_limit, desired_joint_states.velocities[index]) * duration_since_last_call.seconds();
+        desired_joint_states.velocities[index] = current_joint_states.velocities[index] + copysign(accel_limit, accel) * duration_since_last_call.seconds();
         // Recompute position
-        desired_joint_states.positions[index] = current_joint_states.positions[index] + current_joint_states.velocities[index] * duration_since_last_call.seconds() + 0.5 * accel * duration_since_last_call.seconds() * duration_since_last_call.seconds();
+        desired_joint_states.positions[index] = current_joint_states.positions[index] + current_joint_states.velocities[index] * duration_since_last_call.seconds() + 0.5 * copysign(accel_limit, accel) * duration_since_last_call.seconds() * duration_since_last_call.seconds();
       }
     }
   }
