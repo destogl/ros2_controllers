@@ -562,6 +562,54 @@ controller_interface::return_type AdmittanceController::update()
 //   }
   previous_time_ = get_node()->now();
 
+  // Check if desired_joint_states are at/beyond any position limits
+  // - In joint mode, slow down only joints that are at/beyond limits, at maximum speed
+  // - In Cartesian mode, slow down all joints at maximum speed if any are at/beyond limit
+  bool position_limit_triggered = false;
+  for (auto index = 0u; index < num_joints; ++index) {
+    // TODO: Find a better solution for retrieving limits
+    double lower = get_node()->get_parameter("joint_limits." + joint_state_interface_[0][index].get().get_name() + ".lower_position").get_value<double>();
+    double upper = get_node()->get_parameter("joint_limits." + joint_state_interface_[0][index].get().get_name() + ".upper_position").get_value<double>();
+
+    if (desired_joint_states.positions[index] <= lower || desired_joint_states.positions[index] >= upper) {
+      position_limit_triggered = true;
+
+      if (use_joint_commands_as_input_) {
+        // TODO: Revert to current position and immediate halt of movement
+        desired_joint_states.positions[index] = current_joint_states.positions[index];
+        desired_joint_states.velocities[index] = 0.0;
+
+        // TODO: Instead of above state requiring infinite acceleration, compute maximum slowdown obeying vel+acc limits
+        // 1. Apply maximum a and recompute v
+        // 2. Limit v (if necessary, and also adjust a) and recompute p
+        // 3. Sanity check
+
+      } else {
+        // We will limit all joints
+        break;
+      }
+    }
+  }
+
+  if (position_limit_triggered && !use_joint_commands_as_input_) {
+    // In Cartesian admittance mode, stop all joints if one would exceed limit
+      for (auto index = 0u; index < num_joints; ++index) {
+        // Revert desired_joint_states to current_joint_states
+        desired_joint_states.positions[index] = current_joint_states.positions[index];
+        // TODO: Compute clamped velocity
+        desired_joint_states.velocities[index] = 0.0;
+
+        // TODO: Instead of above state requiring infinite acceleration, compute maximum slowdown obeying vel+acc limits
+        // 1. Apply maximum a and recompute v
+        // 2. Limit v (if necessary, and also adjust a) and recompute p
+        // 3. Sanity check
+    }
+  }
+
+  if (position_limit_triggered) {
+    RCLCPP_ERROR_THROTTLE(get_node()->get_logger(), *get_node()->get_clock(), 1000, "Joint(s) approaching position limits in admittance controller, slowing");
+  }
+
   // Write new joint angles to the robot
   for (auto index = 0u; index < num_joints; ++index) {
     if (has_position_command_interface_) {
