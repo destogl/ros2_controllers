@@ -575,14 +575,16 @@ controller_interface::return_type AdmittanceController::update()
       position_limit_triggered = true;
 
       if (use_joint_commands_as_input_) {
-        // TODO: Revert to current position and immediate halt of movement
+        // Slow down joint movement towards joint limit
         desired_joint_states.positions[index] = current_joint_states.positions[index];
         desired_joint_states.velocities[index] = 0.0;
 
-        // TODO: Instead of above state requiring infinite acceleration, compute maximum slowdown obeying vel+acc limits
-        // 1. Apply maximum a and recompute v
-        // 2. Limit v (if necessary, and also adjust a) and recompute p
-        // 3. Sanity check
+        // TODO: Instead of above state requiring infinite acceleration, compute maximum slowdown while obeying vel+acc limits
+        // 1. Compute acc required for joint to stop at t+1
+        // 2. Apply acc limit and compute v at t+1
+        // 3. Apply vel limit (and recompute a if necessary)
+        // 4. Recompute pos at t+1
+        // 5. Sanity check
 
       } else {
         // We will limit all joints
@@ -594,15 +596,16 @@ controller_interface::return_type AdmittanceController::update()
   if (position_limit_triggered && !use_joint_commands_as_input_) {
     // In Cartesian admittance mode, stop all joints if one would exceed limit
       for (auto index = 0u; index < num_joints; ++index) {
-        // Revert desired_joint_states to current_joint_states
+        // Slow down joint movement towards joint limit
         desired_joint_states.positions[index] = current_joint_states.positions[index];
-        // TODO: Compute clamped velocity
         desired_joint_states.velocities[index] = 0.0;
 
-        // TODO: Instead of above state requiring infinite acceleration, compute maximum slowdown obeying vel+acc limits
-        // 1. Apply maximum a and recompute v
-        // 2. Limit v (if necessary, and also adjust a) and recompute p
-        // 3. Sanity check
+        // TODO: Instead of above state requiring infinite acceleration, compute maximum slowdown while obeying vel+acc limits
+        // 1. Compute acc required for joint to stop at t+1
+        // 2. Apply acc limit and compute v at t+1
+        // 3. Apply vel limit (and recompute a if necessary)
+        // 4. Recompute pos at t+1
+        // 5. Sanity check
     }
   }
 
