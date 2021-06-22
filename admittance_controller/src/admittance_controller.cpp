@@ -562,6 +562,27 @@ controller_interface::return_type AdmittanceController::update()
 //   }
   previous_time_ = get_node()->now();
 
+  // Clamp velocities to limits
+  for (auto index = 0u; index < num_joints; ++index) {
+    if(get_node()->get_parameter("joint_limits." + joint_state_interface_[0][index].get().get_name() + ".has_velocity_limits").get_value<bool>()) {
+      double vel_limit = get_node()->get_parameter("joint_limits." + joint_state_interface_[0][index].get().get_name() + ".max_velocity").get_value<double>();
+      if(std::abs(desired_joint_states.velocities[index]) > vel_limit) {
+        desired_joint_states.velocities[index] = copysign(vel_limit, desired_joint_states.velocities[index]);
+      }
+    }
+  }
+
+  // Clamp acclerations to limits
+  for (auto index = 0u; index < num_joints; ++index) {
+    if(get_node()->get_parameter("joint_limits." + joint_state_interface_[0][index].get().get_name() + ".has_acceleration_limits").get_value<bool>()) {
+      double accel_limit = get_node()->get_parameter("joint_limits." + joint_state_interface_[0][index].get().get_name() + ".max_acceleration").get_value<double>();
+      double accel = (desired_joint_states.velocities[index] - current_joint_states.velocities[index]) / duration_since_last_call.seconds();
+      if(std::abs(accel) > accel_limit) {
+        desired_joint_states.velocities[index] = current_joint_states.velocities[index] + copysign(accel_limit, desired_joint_states.velocities[index]) * duration_since_last_call.seconds();
+      }
+    }
+  }
+
   // Check if desired_joint_states are at/beyond any position limits
   // - In joint mode, slow down only joints that are at/beyond limits, at maximum speed
   // - In Cartesian mode, slow down all joints at maximum speed if any are at/beyond limit
