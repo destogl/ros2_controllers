@@ -17,6 +17,7 @@
 #ifndef ADMITTANCE_CONTROLLER__ADMITTANCE_CONTROLLER_HPP_
 #define ADMITTANCE_CONTROLLER__ADMITTANCE_CONTROLLER_HPP_
 
+#include <limits>
 #include <memory>
 #include <string>
 #include <vector>
@@ -29,6 +30,7 @@
 #include "geometry_msgs/msg/transform_stamped.hpp"
 #include "geometry_msgs/msg/wrench_stamped.hpp"
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
+#include "joint_limits/joint_limits.hpp"
 #include "semantic_components/force_torque_sensor.hpp"
 #include "rclcpp_lifecycle/node_interfaces/lifecycle_node_interface.hpp"
 #include "rclcpp_lifecycle/state.hpp"
@@ -74,9 +76,12 @@ protected:
   std::vector<std::string> state_interface_types_;
   std::string ft_sensor_name_;
   bool use_joint_commands_as_input_;
+  bool joint_mode_;
 
   bool hardware_state_has_offset_;
   trajectory_msgs::msg::JointTrajectoryPoint last_commanded_state_;
+
+  std::vector<joint_limits::JointLimits> joint_limits_;
 
   // Internal variables
   std::unique_ptr<semantic_components::ForceTorqueSensor> force_torque_sensor_;

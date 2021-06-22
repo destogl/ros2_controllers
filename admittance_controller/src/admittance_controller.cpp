@@ -29,6 +29,8 @@
 #include "filters/filter_chain.hpp"
 #include "geometry_msgs/msg/wrench.hpp"
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
+#include "joint_limits/joint_limits.hpp"
+#include "joint_limits/joint_limits_rosparam.hpp"
 #include "trajectory_msgs/msg/joint_trajectory_point.hpp"
 
 namespace admittance_controller
@@ -52,6 +54,7 @@ controller_interface::return_type AdmittanceController::init(const std::string &
     get_node()->declare_parameter<std::vector<std::string>>("state_interfaces", {});
     get_node()->declare_parameter<std::string>("ft_sensor_name", "");
     get_node()->declare_parameter<bool>("use_joint_commands_as_input", false);
+    get_node()->declare_parameter<bool>("joint_mode", false);
     get_node()->declare_parameter<bool>("open_loop_control", false);
 
     get_node()->declare_parameter<std::string>("IK.base", "");
@@ -171,6 +174,7 @@ CallbackReturn AdmittanceController::on_configure(
     get_string_array_param_and_error_if_empty(state_interface_types_, "state_interfaces") ||
     get_string_param_and_error_if_empty(ft_sensor_name_, "ft_sensor_name") ||
     get_bool_param_and_error_if_empty(use_joint_commands_as_input_, "use_joint_commands_as_input") ||
+    get_bool_param_and_error_if_empty(joint_mode_, "joint_mode") ||
     get_bool_param_and_error_if_empty(admittance_->open_loop_control_, "open_loop_control") ||
     get_string_param_and_error_if_empty(admittance_->ik_base_frame_, "IK.base") ||
     get_string_param_and_error_if_empty(admittance_->ik_tip_frame_, "IK.tip") ||
@@ -308,6 +312,24 @@ CallbackReturn AdmittanceController::on_configure(
     get_interface_list(command_interface_types_).c_str(),
               get_interface_list(state_interface_types_).c_str());
 
+  auto num_joints = joint_names_.size();
+
+  // Initialize joint limits
+  joint_limits_.resize(num_joints);
+  for (auto i = 0ul; i < num_joints; ++i) {
+    joint_limits::declare_parameters(joint_names_[i], get_node());
+    joint_limits::get_joint_limits(joint_names_[i], get_node(), joint_limits_[i]);
+    RCLCPP_INFO(get_node()->get_logger(), "Joint '%s':\n  has position limits: %s [%e, %e]"
+                "\n  has velocity limits: %s [%e]\n  has acceleration limits: %s [%e]",
+                joint_names_[i].c_str(), joint_limits_[i].has_position_limits ? "true" : "false",
+                joint_limits_[i].min_position, joint_limits_[i].max_position,
+                joint_limits_[i].has_velocity_limits ? "true" : "false",
+                joint_limits_[i].max_velocity,
+                joint_limits_[i].has_acceleration_limits ? "true" : "false",
+                joint_limits_[i].max_acceleration
+               );
+  }
+
   // Initialize FTS semantic semantic_component
   force_torque_sensor_ = std::make_unique<semantic_components::ForceTorqueSensor>(
     semantic_components::ForceTorqueSensor(ft_sensor_name_));
@@ -346,8 +368,6 @@ CallbackReturn AdmittanceController::on_configure(
     "~/state", rclcpp::SystemDefaultsQoS());
   state_publisher_ = std::make_unique<ControllerStatePublisher>(s_publisher_);
 
-  auto num_joints = joint_names_.size();
-
   // Initialize state message
   state_publisher_->lock();
   state_publisher_->msg_.joint_names = joint_names_;
@@ -364,11 +384,11 @@ CallbackReturn AdmittanceController::on_configure(
   last_commanded_state_.accelerations.resize(num_joints, 0.0);
 
   if (use_joint_commands_as_input_) {
-    RCLCPP_INFO_STREAM(get_node()->get_logger(), "Using Joint input mode.");
+    RCLCPP_INFO(get_node()->get_logger(), "Using Joint input mode.");
   } else {
-    RCLCPP_INFO_STREAM(get_node()->get_logger(), "Using Cartesian input mode.");
+    RCLCPP_INFO(get_node()->get_logger(), "Using Cartesian input mode.");
   }
-  RCLCPP_INFO_STREAM(get_node()->get_logger(), "configure successful");
+  RCLCPP_INFO(get_node()->get_logger(), "configure successful");
   return CallbackReturn::SUCCESS;
 }
 
@@ -564,10 +584,9 @@ controller_interface::return_type AdmittanceController::update()
 
   // Clamp velocities to limits
   for (auto index = 0u; index < num_joints; ++index) {
-    if(get_node()->get_parameter("joint_limits." + joint_state_interface_[0][index].get().get_name() + ".has_velocity_limits").get_value<bool>()) {
-      double vel_limit = get_node()->get_parameter("joint_limits." + joint_state_interface_[0][index].get().get_name() + ".max_velocity").get_value<double>();
-      if(std::abs(desired_joint_states.velocities[index]) > vel_limit) {
-        desired_joint_states.velocities[index] = copysign(vel_limit, desired_joint_states.velocities[index]);
+    if(joint_limits_[index].has_velocity_limits) {
+      if(std::abs(desired_joint_states.velocities[index]) > joint_limits_[index].max_velocity) {
+        desired_joint_states.velocities[index] = copysign(joint_limits_[index].max_velocity, desired_joint_states.velocities[index]);
         double accel = (desired_joint_states.velocities[index] - current_joint_states.velocities[index]) / duration_since_last_call.seconds();
         // Recompute position
         desired_joint_states.positions[index] = current_joint_states.positions[index] + current_joint_states.velocities[index] * duration_since_last_call.seconds() + 0.5 * accel * duration_since_last_call.seconds() * duration_since_last_call.seconds();
@@ -577,47 +596,36 @@ controller_interface::return_type AdmittanceController::update()
 
   // Clamp acclerations to limits
   for (auto index = 0u; index < num_joints; ++index) {
-    if(get_node()->get_parameter("joint_limits." + joint_state_interface_[0][index].get().get_name() + ".has_acceleration_limits").get_value<bool>()) {
-      double accel_limit = get_node()->get_parameter("joint_limits." + joint_state_interface_[0][index].get().get_name() + ".max_acceleration").get_value<double>();
+    if(joint_limits_[index].has_acceleration_limits) {
       double accel = (desired_joint_states.velocities[index] - current_joint_states.velocities[index]) / duration_since_last_call.seconds();
-      if(std::abs(accel) > accel_limit) {
-        desired_joint_states.velocities[index] = current_joint_states.velocities[index] + copysign(accel_limit, accel) * duration_since_last_call.seconds();
+      if(std::abs(accel) > joint_limits_[index].max_acceleration) {
+        desired_joint_states.velocities[index] = current_joint_states.velocities[index] + copysign(joint_limits_[index].max_acceleration, accel) * duration_since_last_call.seconds();
         // Recompute position
-        desired_joint_states.positions[index] = current_joint_states.positions[index] + current_joint_states.velocities[index] * duration_since_last_call.seconds() + 0.5 * copysign(accel_limit, accel) * duration_since_last_call.seconds() * duration_since_last_call.seconds();
+        desired_joint_states.positions[index] = current_joint_states.positions[index] + current_joint_states.velocities[index] * duration_since_last_call.seconds() + 0.5 * copysign(joint_limits_[index].max_acceleration, accel) * duration_since_last_call.seconds() * duration_since_last_call.seconds();
       }
     }
   }
-
-  // TODO: Remove when param is added in
-  bool joint_mode_ = true;
 
   // Check that stopping distance is within joint limits
   // - In joint mode, slow down only joints whose stopping distance isn't inside joint limits, at maximum decel
   // - In Cartesian mode, slow down all joints at maximum decel if any don't have stopping distance within joint limits
   bool position_limit_triggered = false;
   for (auto index = 0u; index < num_joints; ++index) {
-    if(get_node()->get_parameter("joint_limits." + joint_state_interface_[0][index].get().get_name() + ".has_acceleration_limits").get_value<bool>()) {
-      // TODO: Handle URDFs where no acc limit is provided
-
-      // TODO: Find a better solution for retrieving limits
-      double lower = get_node()->get_parameter("joint_limits." + joint_state_interface_[0][index].get().get_name() + ".lower_position").get_value<double>();
-      double upper = get_node()->get_parameter("joint_limits." + joint_state_interface_[0][index].get().get_name() + ".upper_position").get_value<double>();
-      double accel_limit = get_node()->get_parameter("joint_limits." + joint_state_interface_[0][index].get().get_name() + ".max_acceleration").get_value<double>();
-
+    if(joint_limits_[index].has_acceleration_limits) {
       // delta_x = (v2*v2 - v1*v1) / (2*a)
-      // stopping_distance = (- v1*v1) / (2*accel_limit)
+      // stopping_distance = (- v1*v1) / (2*max_acceleration)
       // Here we assume we will not trigger velocity limits while maximally decelerating. This is a valid assumption if we are not currently at a velocity limit since we are just coming to a rest.
-      double stopping_distance = std::abs((- desired_joint_states.velocities[index] * desired_joint_states.velocities[index]) / (2 * accel_limit));
+      double stopping_distance = std::abs((- desired_joint_states.velocities[index] * desired_joint_states.velocities[index]) / (2 * joint_limits_[index].max_acceleration));
       // Check that joint limits are beyond stopping_distance
-      if(upper - current_joint_states.positions[index] < stopping_distance || current_joint_states.positions[index] - lower < stopping_distance) {
+      if(joint_limits_[index].max_position - current_joint_states.positions[index] < stopping_distance || current_joint_states.positions[index] - joint_limits_[index].min_position < stopping_distance) {
         position_limit_triggered = true;
 
         if(joint_mode_) {
           // Apply maximum acceleration away from joint limit
-          double accel_sign = (upper - current_joint_states.positions[index] < stopping_distance) ? -1.0 : 1.0;
-          desired_joint_states.velocities[index] = current_joint_states.velocities[index] + copysign(accel_limit, accel_sign) * duration_since_last_call.seconds();
+          double accel_sign = (joint_limits_[index].max_position - current_joint_states.positions[index] < stopping_distance) ? -1.0 : 1.0;
+          desired_joint_states.velocities[index] = current_joint_states.velocities[index] + copysign(joint_limits_[index].max_acceleration, accel_sign) * duration_since_last_call.seconds();
           // Recompute position
-          desired_joint_states.positions[index] = current_joint_states.positions[index] + current_joint_states.velocities[index] * duration_since_last_call.seconds() + 0.5 * copysign(accel_limit, accel_sign) * duration_since_last_call.seconds() * duration_since_last_call.seconds();
+          desired_joint_states.positions[index] = current_joint_states.positions[index] + current_joint_states.velocities[index] * duration_since_last_call.seconds() + 0.5 * copysign(joint_limits_[index].max_acceleration, accel_sign) * duration_since_last_call.seconds() * duration_since_last_call.seconds();
         } else {
             // We will limit all joints
             break;
@@ -629,12 +637,11 @@ controller_interface::return_type AdmittanceController::update()
   if (position_limit_triggered && !joint_mode_) {
     // In Cartesian admittance mode, stop all joints if one would exceed limit
     for (auto index = 0u; index < num_joints; ++index) {
-      if(get_node()->get_parameter("joint_limits." + joint_state_interface_[0][index].get().get_name() + ".has_acceleration_limits").get_value<bool>()) {
+      if(joint_limits_[index].has_acceleration_limits) {
         // Compute accel to stop
         // Here we aren't explicitly maximally decelerating, but for joints near their limits this should still result in max decel being used
-        double accel_limit = get_node()->get_parameter("joint_limits." + joint_state_interface_[0][index].get().get_name() + ".max_acceleration").get_value<double>();
         double accel_to_stop = -current_joint_states.velocities[index] / duration_since_last_call.seconds();
-        double limited_accel = copysign(std::min(std::abs(accel_to_stop), accel_limit), accel_to_stop);
+        double limited_accel = copysign(std::min(std::abs(accel_to_stop), joint_limits_[index].max_acceleration), accel_to_stop);
 
         desired_joint_states.velocities[index] = current_joint_states.velocities[index] + limited_accel * duration_since_last_call.seconds();
         // Recompute position
