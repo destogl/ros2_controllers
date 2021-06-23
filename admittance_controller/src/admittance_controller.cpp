@@ -33,6 +33,8 @@
 #include "joint_limits/joint_limits_rosparam.hpp"
 #include "trajectory_msgs/msg/joint_trajectory_point.hpp"
 
+constexpr size_t ROS_LOG_THROTTLE_PERIOD = 30 * 1000;  // Milliseconds to throttle logs inside loops
+
 namespace admittance_controller
 {
 AdmittanceController::AdmittanceController()
@@ -591,6 +593,7 @@ controller_interface::return_type AdmittanceController::update()
   for (auto index = 0u; index < num_joints; ++index) {
     if(joint_limits_[index].has_velocity_limits) {
       if(std::abs(desired_joint_states.velocities[index]) > joint_limits_[index].max_velocity) {
+        RCLCPP_WARN_STREAM_THROTTLE(get_node()->get_logger(), *get_node()->get_clock(), ROS_LOG_THROTTLE_PERIOD, "Joint(s) would exceed velocity limits, limiting");
         desired_joint_states.velocities[index] = copysign(joint_limits_[index].max_velocity, desired_joint_states.velocities[index]);
         double accel = (desired_joint_states.velocities[index] - current_joint_states.velocities[index]) / duration_since_last_call.seconds();
         // Recompute position
@@ -604,6 +607,7 @@ controller_interface::return_type AdmittanceController::update()
     if(joint_limits_[index].has_acceleration_limits) {
       double accel = (desired_joint_states.velocities[index] - current_joint_states.velocities[index]) / duration_since_last_call.seconds();
       if(std::abs(accel) > joint_limits_[index].max_acceleration) {
+        RCLCPP_WARN_STREAM_THROTTLE(get_node()->get_logger(), *get_node()->get_clock(), ROS_LOG_THROTTLE_PERIOD, "Joint(s) would exceed acceleration limits, limiting");
         desired_joint_states.velocities[index] = current_joint_states.velocities[index] + copysign(joint_limits_[index].max_acceleration, accel) * duration_since_last_call.seconds();
         // Recompute position
         desired_joint_states.positions[index] = current_joint_states.positions[index] + current_joint_states.velocities[index] * duration_since_last_call.seconds() + 0.5 * copysign(joint_limits_[index].max_acceleration, accel) * duration_since_last_call.seconds() * duration_since_last_call.seconds();
@@ -621,8 +625,13 @@ controller_interface::return_type AdmittanceController::update()
       // stopping_distance = (- v1*v1) / (2*max_acceleration)
       // Here we assume we will not trigger velocity limits while maximally decelerating. This is a valid assumption if we are not currently at a velocity limit since we are just coming to a rest.
       double stopping_distance = std::abs((- desired_joint_states.velocities[index] * desired_joint_states.velocities[index]) / (2 * joint_limits_[index].max_acceleration));
-      // Check that joint limits are beyond stopping_distance
-      if(joint_limits_[index].max_position - current_joint_states.positions[index] < stopping_distance || current_joint_states.positions[index] - joint_limits_[index].min_position < stopping_distance) {
+      // Check that joint limits are beyond stopping_distance and desired_velocity is towards that limit
+      // TODO: Should we consider sign on acceleration here?
+      if ((desired_joint_states.velocities[index] < 0 &&
+           (current_joint_states.positions[index] - joint_limits_[index].min_position < stopping_distance)) ||
+          (desired_joint_states.velocities[index] > 0 &&
+           (joint_limits_[index].max_position - current_joint_states.positions[index] < stopping_distance))) {
+        RCLCPP_WARN_STREAM_THROTTLE(get_node()->get_logger(), *get_node()->get_clock(), ROS_LOG_THROTTLE_PERIOD, "Joint(s) would exceed position limits, limiting");
         position_limit_triggered = true;
 
         if(joint_mode_) {
@@ -653,10 +662,6 @@ controller_interface::return_type AdmittanceController::update()
         desired_joint_states.positions[index] = current_joint_states.positions[index] + current_joint_states.velocities[index] * duration_since_last_call.seconds() + 0.5 * limited_accel * duration_since_last_call.seconds() * duration_since_last_call.seconds();
       }
     }
-  }
-
-  if (position_limit_triggered) {
-    RCLCPP_ERROR_THROTTLE(get_node()->get_logger(), *get_node()->get_clock(), 1000, "Joint(s) would exceed position limits in admittance controller, limiting");
   }
 
   // Write new joint angles to the robot
