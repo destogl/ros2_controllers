@@ -587,16 +587,21 @@ controller_interface::return_type AdmittanceController::update()
     if(joint_limits_[index].has_velocity_limits) {
       if(std::abs(desired_joint_states.velocities[index]) > joint_limits_[index].max_velocity) {
         desired_joint_states.velocities[index] = copysign(joint_limits_[index].max_velocity, desired_joint_states.velocities[index]);
-        double accel = (desired_joint_states.velocities[index] - current_joint_states.velocities[index]) / duration_since_last_call.seconds();
-        // Recompute position
-        desired_joint_states.positions[index] = current_joint_states.positions[index] + current_joint_states.velocities[index] * duration_since_last_call.seconds() + 0.5 * accel * duration_since_last_call.seconds() * duration_since_last_call.seconds();
+        if(current_joint_states.velocities.size() > index) {
+          double accel = (desired_joint_states.velocities[index] - current_joint_states.velocities[index]) / duration_since_last_call.seconds();
+          // Recompute position
+          desired_joint_states.positions[index] = current_joint_states.positions[index] + current_joint_states.velocities[index] * duration_since_last_call.seconds() + 0.5 * accel * duration_since_last_call.seconds() * duration_since_last_call.seconds();
+        } else {
+          // TODO: Expose current_joint_states.velocities, until then use desired velocity in place of current velocity
+          desired_joint_states.positions[index] = current_joint_states.positions[index] + desired_joint_states.velocities[index] * duration_since_last_call.seconds();
+        }
       }
     }
   }
 
   // Clamp acclerations to limits
   for (auto index = 0u; index < num_joints; ++index) {
-    if(joint_limits_[index].has_acceleration_limits) {
+    if(joint_limits_[index].has_acceleration_limits && current_joint_states.velocities.size() > index) {
       double accel = (desired_joint_states.velocities[index] - current_joint_states.velocities[index]) / duration_since_last_call.seconds();
       if(std::abs(accel) > joint_limits_[index].max_acceleration) {
         desired_joint_states.velocities[index] = current_joint_states.velocities[index] + copysign(joint_limits_[index].max_acceleration, accel) * duration_since_last_call.seconds();
