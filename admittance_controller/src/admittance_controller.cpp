@@ -582,26 +582,26 @@ controller_interface::return_type AdmittanceController::update()
 //   }
   previous_time_ = get_node()->now();
 
+  if(current_joint_states.velocities.empty()) {
+    // First update() after activating does not have velocity available, assume 0
+    current_joint_states.velocities.resize(num_joints, 0.0);
+  }
+
   // Clamp velocities to limits
   for (auto index = 0u; index < num_joints; ++index) {
     if(joint_limits_[index].has_velocity_limits) {
       if(std::abs(desired_joint_states.velocities[index]) > joint_limits_[index].max_velocity) {
         desired_joint_states.velocities[index] = copysign(joint_limits_[index].max_velocity, desired_joint_states.velocities[index]);
-        if(current_joint_states.velocities.size() > index) {
-          double accel = (desired_joint_states.velocities[index] - current_joint_states.velocities[index]) / duration_since_last_call.seconds();
-          // Recompute position
-          desired_joint_states.positions[index] = current_joint_states.positions[index] + current_joint_states.velocities[index] * duration_since_last_call.seconds() + 0.5 * accel * duration_since_last_call.seconds() * duration_since_last_call.seconds();
-        } else {
-          // TODO: Expose current_joint_states.velocities, until then use desired velocity in place of current velocity
-          desired_joint_states.positions[index] = current_joint_states.positions[index] + desired_joint_states.velocities[index] * duration_since_last_call.seconds();
-        }
+        double accel = (desired_joint_states.velocities[index] - current_joint_states.velocities[index]) / duration_since_last_call.seconds();
+        // Recompute position
+        desired_joint_states.positions[index] = current_joint_states.positions[index] + current_joint_states.velocities[index] * duration_since_last_call.seconds() + 0.5 * accel * duration_since_last_call.seconds() * duration_since_last_call.seconds();
       }
     }
   }
 
   // Clamp acclerations to limits
   for (auto index = 0u; index < num_joints; ++index) {
-    if(joint_limits_[index].has_acceleration_limits && current_joint_states.velocities.size() > index) {
+    if(joint_limits_[index].has_acceleration_limits) {
       double accel = (desired_joint_states.velocities[index] - current_joint_states.velocities[index]) / duration_since_last_call.seconds();
       if(std::abs(accel) > joint_limits_[index].max_acceleration) {
         desired_joint_states.velocities[index] = current_joint_states.velocities[index] + copysign(joint_limits_[index].max_acceleration, accel) * duration_since_last_call.seconds();
