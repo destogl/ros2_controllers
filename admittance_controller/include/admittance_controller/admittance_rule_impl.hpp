@@ -151,12 +151,9 @@ controller_interface::return_type AdmittanceRule::update(
     // Sum admittance displacements (in ik_base_frame) from the previous relative poses
     for (auto i = 0u; i < 6; ++i) {
       sum_of_admittance_displacements_arr_[i] += relative_admittance_pose_arr_[i];
-
-//       RCLCPP_INFO(rclcpp::get_logger("AR"), "displacement for index %zu is %e and absolute %e", i, relative_admittance_pose_arr_[i], sum_of_admittance_displacements_arr_[i]);
     }
 
     // Transform sum of admittance displacements to control frame
-//     RCLCPP_INFO(rclcpp::get_logger("AR"), "calculate sum_of_admittance_displacements trafo");
     convert_array_to_message(sum_of_admittance_displacements_arr_, sum_of_admittance_displacements_);
     transform_relative_to_control_frame(sum_of_admittance_displacements_, sum_of_admittance_displacements_control_frame_);
     convert_message_to_array(sum_of_admittance_displacements_control_frame_, pose_error);
@@ -165,7 +162,6 @@ controller_interface::return_type AdmittanceRule::update(
   process_wrench_measurements(measured_wrench);
 
   // Transform internal state to updated control frame - could be changed since the last update
-//   RCLCPP_INFO(rclcpp::get_logger("AR"), "calculate velocity in 'new control frame' trafo");
   transform_relative_to_control_frame(
     admittance_velocity_ik_base_frame_, admittance_velocity_control_frame_);
   convert_message_to_array(admittance_velocity_control_frame_, admittance_velocity_arr_);
@@ -177,12 +173,10 @@ controller_interface::return_type AdmittanceRule::update(
   // Transform internal states from current "control" frame to "ik base" frame
   // Do clean conversion to the goal pose using transform and not messing with Euler angles
   convert_array_to_message(relative_admittance_pose_arr_, relative_admittance_pose_control_frame_);
-//   RCLCPP_INFO(rclcpp::get_logger("AR"), "calculate relative admittance pose in ik base frame trafo");
   transform_relative_to_ik_base_frame(
     relative_admittance_pose_control_frame_, relative_admittance_pose_ik_base_frame_);
   convert_message_to_array(relative_admittance_pose_ik_base_frame_, relative_admittance_pose_arr_);
 
-//   RCLCPP_INFO(rclcpp::get_logger("AR"), "calculate velocity for the next update ik base frame trafo");
   convert_array_to_message(admittance_velocity_arr_, admittance_velocity_control_frame_);
   transform_relative_to_ik_base_frame(
     admittance_velocity_control_frame_, admittance_velocity_ik_base_frame_);

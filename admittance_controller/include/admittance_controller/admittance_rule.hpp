@@ -442,9 +442,6 @@ private:
         if (std::fabs(relative_message_transformed_arr[i]) < POSE_ERROR_EPSILON) {
           relative_message_transformed_arr[i] = 0.0;
         }
-
-//         RCLCPP_INFO(rclcpp::get_logger("AR"), "displacement after transforming index %zu is %e = %e - %e",
-//                     i, relative_message_transformed_arr[i], message_transformed_arr[i], zero_pose_transformed_arr[i]);
       }
       message_out.header = message_transformed.header;
       convert_array_to_message(relative_message_transformed_arr, message_out);
