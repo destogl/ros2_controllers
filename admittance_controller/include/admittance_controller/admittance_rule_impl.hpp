@@ -28,138 +28,6 @@
 #include "tf2/utils.h"
 #include "tf2_eigen/tf2_eigen.h"
 
-namespace {  // Utility namespace
-
-// Numerical accuracy checks. Used as deadbands.
-static constexpr double WRENCH_EPSILON = 1e-10;
-static constexpr double POSE_ERROR_EPSILON = 1e-12;
-static constexpr double POSE_EPSILON = 1e-15;
-
-template<typename Type>
-void convert_message_to_array(const geometry_msgs::msg::Pose & msg, Type & vector_out)
-{
-  vector_out[0] = msg.position.x;
-  vector_out[1] = msg.position.y;
-  vector_out[2] = msg.position.z;
-  tf2::Quaternion q;
-  tf2::fromMsg(msg.orientation, q);
-  q.normalize();
-  tf2::Matrix3x3(q).getRPY(vector_out[3], vector_out[4], vector_out[5]);
-  for (auto i = 3u; i < 6; ++i) {
-    vector_out[i] = angles::normalize_angle(vector_out[i]);
-  }
-}
-
-template<typename Type>
-void convert_message_to_array(
-  const geometry_msgs::msg::PoseStamped & msg, Type & vector_out)
-{
-  convert_message_to_array(msg.pose, vector_out);
-}
-
-template<typename Type>
-void convert_message_to_array(const geometry_msgs::msg::Transform & msg, Type & vector_out)
-{
-  vector_out[0] = msg.translation.x;
-  vector_out[1] = msg.translation.y;
-  vector_out[2] = msg.translation.z;
-  tf2::Quaternion q;
-  tf2::fromMsg(msg.rotation, q);
-  q.normalize();
-  tf2::Matrix3x3(q).getRPY(vector_out[3], vector_out[4], vector_out[5]);
-  for (auto i = 3u; i < 6; ++i) {
-    vector_out[i] = angles::normalize_angle(vector_out[i]);
-  }
-}
-
-template<typename Type>
-void convert_message_to_array(const geometry_msgs::msg::TransformStamped & msg, Type & vector_out)
-{
-  convert_message_to_array(msg.transform, vector_out);
-}
-
-template<typename Type>
-void convert_message_to_array(
-  const geometry_msgs::msg::Wrench & msg, Type & vector_out)
-{
-  vector_out[0] = msg.force.x;
-  vector_out[1] = msg.force.y;
-  vector_out[2] = msg.force.z;
-  vector_out[3] = msg.torque.x;
-  vector_out[4] = msg.torque.y;
-  vector_out[5] = msg.torque.z;
-}
-
-template<typename Type>
-void convert_message_to_array(
-  const geometry_msgs::msg::WrenchStamped & msg, Type & vector_out)
-{
-  convert_message_to_array(msg.wrench, vector_out);
-}
-
-template<typename Type>
-void convert_array_to_message(const Type & vector, geometry_msgs::msg::Pose & msg_out)
-{
-  msg_out.position.x = vector[0];
-  msg_out.position.y = vector[1];
-  msg_out.position.z = vector[2];
-
-  tf2::Quaternion q;
-  q.setRPY(vector[3], vector[4], vector[5]);
-
-  msg_out.orientation.x = q.x();
-  msg_out.orientation.y = q.y();
-  msg_out.orientation.z = q.z();
-  msg_out.orientation.w = q.w();
-}
-
-template<typename Type>
-void convert_array_to_message(const Type & vector, geometry_msgs::msg::PoseStamped & msg_out)
-{
-  convert_array_to_message(vector, msg_out.pose);
-}
-
-// template<typename Type>
-// void convert_array_to_message(const Type & vector, geometry_msgs::msg::Wrench & msg_out)
-// {
-//   msg_out.force.x = vector[0];
-//   msg_out.force.y = vector[1];
-//   msg_out.force.z = vector[2];
-//   msg_out.torque.x = vector[3];
-//   msg_out.torque.y = vector[4];
-//   msg_out.torque.z = vector[5];
-// }
-
-// template<typename Type>
-// void convert_array_to_message(const Type & vector, geometry_msgs::msg::WrenchStamped & msg_out)
-// {
-//   convert_array_to_message(vector, msg_out.wrench);
-// }
-
-template<typename Type>
-void convert_array_to_message(const Type & vector, geometry_msgs::msg::Transform & msg_out)
-{
-  msg_out.translation.x = vector[0];
-  msg_out.translation.y = vector[1];
-  msg_out.translation.z = vector[2];
-
-  tf2::Quaternion q;
-  q.setRPY(vector[3], vector[4], vector[5]);
-
-  msg_out.rotation.x = q.x();
-  msg_out.rotation.y = q.y();
-  msg_out.rotation.z = q.z();
-  msg_out.rotation.w = q.w();
-}
-
-template<typename Type>
-void convert_array_to_message(const Type & vector, geometry_msgs::msg::TransformStamped & msg_out)
-{
-  convert_array_to_message(vector, msg_out.transform);
-}
-
-}  // utility namespace
-
 namespace admittance_controller
 {
 
@@ -172,8 +40,17 @@ controller_interface::return_type AdmittanceRule::configure(rclcpp::Node::Shared
   // Initialize variables used in the update loop
   measured_wrench_.header.frame_id = sensor_frame_;
 
-  relative_admittance_pose_.header.frame_id = control_frame_;
-  relative_admittance_pose_.child_frame_id = control_frame_;
+  relative_admittance_pose_ik_base_frame_.header.frame_id = ik_base_frame_;
+  relative_admittance_pose_ik_base_frame_.child_frame_id = ik_base_frame_;
+  relative_admittance_pose_control_frame_.header.frame_id = control_frame_;
+  relative_admittance_pose_control_frame_.child_frame_id = control_frame_;
+
+  admittance_velocity_ik_base_frame_.header.frame_id = ik_base_frame_;
+  admittance_velocity_ik_base_frame_.child_frame_id = ik_base_frame_;
+  admittance_velocity_control_frame_.header.frame_id = control_frame_;
+  admittance_velocity_control_frame_.child_frame_id = control_frame_;
+
+  sum_of_admittance_displacements_.header.frame_id = ik_base_frame_;
 
   reference_joint_deltas_vec_.reserve(6);
   reference_deltas_vec_ik_base_.reserve(6);
@@ -198,8 +75,8 @@ controller_interface::return_type AdmittanceRule::configure(rclcpp::Node::Shared
 controller_interface::return_type AdmittanceRule::reset()
 {
   measured_wrench_ik_base_frame_arr_.fill(0.0);
-  reference_pose_ik_base_frame_arr_.fill(0.0);
-  current_pose_ik_base_frame_arr_.fill(0.0);
+  reference_pose_arr_.fill(0.0);
+  current_pose_arr_.fill(0.0);
   admittance_velocity_arr_.fill(0.0);
   sum_of_admittance_displacements_arr_.fill(0.0);
 
@@ -242,18 +119,21 @@ controller_interface::return_type AdmittanceRule::update(
   transform_to_ik_base_frame(reference_pose, reference_pose_ik_base_frame_);
 
   std::array<double, 6> pose_error;
+  geometry_msgs::msg::TransformStamped pose_error_pose;
+  pose_error_pose.header.frame_id = ik_base_frame_;
+  pose_error_pose.child_frame_id = control_frame_;
 
   if (!open_loop_control_) {
     get_pose_of_control_frame_in_base_frame(current_pose_ik_base_frame_);
 
     // Convert all data to arrays for simpler calculation
-    //   transform_to_control_frame(reference_pose_ik_base_frame_, reference_pose_ik_base_frame_);
-    convert_message_to_array(reference_pose_ik_base_frame_, reference_pose_ik_base_frame_arr_);
-    //   transform_to_control_frame(current_pose_ik_base_frame_, current_pose_ik_base_frame_);
-    convert_message_to_array(current_pose_ik_base_frame_, current_pose_ik_base_frame_arr_);
+    transform_to_control_frame(reference_pose_ik_base_frame_, current_pose_control_frame_);
+    convert_message_to_array(current_pose_control_frame_, reference_pose_arr_);
+    transform_to_control_frame(current_pose_ik_base_frame_, reference_pose_control_frame_);
+    convert_message_to_array(reference_pose_control_frame_, current_pose_arr_);
 
     for (auto i = 0u; i < 6; ++i) {
-      pose_error[i] = current_pose_ik_base_frame_arr_[i] - reference_pose_ik_base_frame_arr_[i];
+      pose_error[i] = current_pose_arr_[i] - reference_pose_arr_[i];
 
       if (i >= 3) {
         pose_error[i] = angles::normalize_angle(pose_error[i]);
@@ -268,42 +148,48 @@ controller_interface::return_type AdmittanceRule::update(
     // TODO(destogl): This will maybe now work when no feed-forward is used
     current_pose_ik_base_frame_ = reference_pose_ik_base_frame_;
 
+    // Sum admittance displacements (in ik_base_frame) from the previous relative poses
     for (auto i = 0u; i < 6; ++i) {
-      // Sum admittance displacements (in ik_base_frame) from the previous relative poses
       sum_of_admittance_displacements_arr_[i] += relative_admittance_pose_arr_[i];
 
-      if (i >= 3) {
-        sum_of_admittance_displacements_arr_[i] = angles::normalize_angle(sum_of_admittance_displacements_arr_[i]);
-      }
-      if (std::fabs(sum_of_admittance_displacements_arr_[i]) < POSE_ERROR_EPSILON) {
-        sum_of_admittance_displacements_arr_[i] = 0.0;
-      }
+//       RCLCPP_INFO(rclcpp::get_logger("AR"), "displacement for index %zu is %e and absolute %e", i, relative_admittance_pose_arr_[i], sum_of_admittance_displacements_arr_[i]);
     }
 
-    // Convert admittance displacements to control_frame_
-    //     convert_array_to_message(sum_of_admittance_displacements_arr_, sum_of_admittance_displacements_);
-    //     transform_to_control_frame(sum_of_admittance_displacements_, sum_of_admittance_displacements_);
-    //     convert_message_to_array(sum_of_admittance_displacements_, sum_of_admittance_displacements_arr_);
-
-    // In open-loop mode, spring force is related to the accumulated "admittance displacement"
-    pose_error = sum_of_admittance_displacements_arr_;
+    // Transform sum of admittance displacements to control frame
+//     RCLCPP_INFO(rclcpp::get_logger("AR"), "calculate sum_of_admittance_displacements trafo");
+    convert_array_to_message(sum_of_admittance_displacements_arr_, sum_of_admittance_displacements_);
+    transform_relative_to_control_frame(sum_of_admittance_displacements_, sum_of_admittance_displacements_control_frame_);
+    convert_message_to_array(sum_of_admittance_displacements_control_frame_, pose_error);
   }
 
   process_wrench_measurements(measured_wrench);
 
+  // Transform internal state to updated control frame - could be changed since the last update
+//   RCLCPP_INFO(rclcpp::get_logger("AR"), "calculate velocity in 'new control frame' trafo");
+  transform_relative_to_control_frame(
+    admittance_velocity_ik_base_frame_, admittance_velocity_control_frame_);
+  convert_message_to_array(admittance_velocity_control_frame_, admittance_velocity_arr_);
+
+  // Calculate admittance rule in the control frame
   calculate_admittance_rule(
     measured_wrench_ik_base_frame_arr_, pose_error, period, relative_admittance_pose_arr_);
 
-  // This works in all cases because not current TF data are used
+  // Transform internal states from current "control" frame to "ik base" frame
   // Do clean conversion to the goal pose using transform and not messing with Euler angles
-  convert_array_to_message(relative_admittance_pose_arr_, relative_admittance_pose_);
+  convert_array_to_message(relative_admittance_pose_arr_, relative_admittance_pose_control_frame_);
+//   RCLCPP_INFO(rclcpp::get_logger("AR"), "calculate relative admittance pose in ik base frame trafo");
+  transform_relative_to_ik_base_frame(
+    relative_admittance_pose_control_frame_, relative_admittance_pose_ik_base_frame_);
+  convert_message_to_array(relative_admittance_pose_ik_base_frame_, relative_admittance_pose_arr_);
 
-  // Store relative admittance pose array in ik_base_frame between control loops and for IK
-//   transform_to_ik_base_frame(relative_admittance_pose_, relative_admittance_pose_);
-//   convert_message_to_array(relative_admittance_pose_, relative_admittance_pose_arr_);
+//   RCLCPP_INFO(rclcpp::get_logger("AR"), "calculate velocity for the next update ik base frame trafo");
+  convert_array_to_message(admittance_velocity_arr_, admittance_velocity_control_frame_);
+  transform_relative_to_ik_base_frame(
+    admittance_velocity_control_frame_, admittance_velocity_ik_base_frame_);
 
   // Add deltas to previously-desired pose to get the next desired pose
-  tf2::doTransform(current_pose_ik_base_frame_, admittance_pose_ik_base_frame_, relative_admittance_pose_);
+  tf2::doTransform(current_pose_ik_base_frame_, admittance_pose_ik_base_frame_,
+                   relative_admittance_pose_ik_base_frame_);
 
   return calculate_desired_joint_state(current_joint_state, relative_admittance_pose_arr_,
                                        period, desired_joint_state);
@@ -391,7 +277,7 @@ controller_interface::return_type AdmittanceRule::get_controller_state(
 
   state_message.current_pose = current_pose_ik_base_frame_;
   state_message.desired_pose = admittance_pose_ik_base_frame_;
-  state_message.relative_desired_pose = relative_admittance_pose_;
+  state_message.relative_desired_pose = relative_admittance_pose_ik_base_frame_;
 
   return controller_interface::return_type::OK;
 }
@@ -423,7 +309,7 @@ void AdmittanceRule::process_wrench_measurements(
 
   // TODO(destogl): rename this variables...
   transform_to_ik_base_frame(measured_wrench_filtered_, measured_wrench_ik_base_frame_);
-//   transform_to_control_frame(measured_wrench_filtered_, measured_wrench_ik_base_frame_);
+  transform_to_control_frame(measured_wrench_filtered_, measured_wrench_ik_base_frame_);
   convert_message_to_array(measured_wrench_ik_base_frame_, measured_wrench_ik_base_frame_arr_);
 
   // TODO(destogl): optimize this checks!
