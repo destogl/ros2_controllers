@@ -40,11 +40,13 @@ controller_interface::return_type AdmittanceRule::configure(rclcpp::Node::Shared
   // Initialize variables used in the update loop
   measured_wrench_.header.frame_id = sensor_frame_;
 
+  // The variables represent transformation within the same frame
   relative_admittance_pose_ik_base_frame_.header.frame_id = ik_base_frame_;
   relative_admittance_pose_ik_base_frame_.child_frame_id = ik_base_frame_;
   relative_admittance_pose_control_frame_.header.frame_id = control_frame_;
   relative_admittance_pose_control_frame_.child_frame_id = control_frame_;
 
+  // The variables represent transformation within the same frame
   admittance_velocity_ik_base_frame_.header.frame_id = ik_base_frame_;
   admittance_velocity_ik_base_frame_.child_frame_id = ik_base_frame_;
   admittance_velocity_control_frame_.header.frame_id = control_frame_;
@@ -54,6 +56,7 @@ controller_interface::return_type AdmittanceRule::configure(rclcpp::Node::Shared
 
   reference_joint_deltas_vec_.reserve(6);
   reference_deltas_vec_ik_base_.reserve(6);
+  // The variables represent transformation within the same frame
   reference_deltas_ik_base_.header.frame_id = ik_base_frame_;
   reference_deltas_ik_base_.child_frame_id = ik_base_frame_;
 
@@ -88,19 +91,6 @@ controller_interface::return_type AdmittanceRule::reset()
   if (open_loop_control_) {
     get_pose_of_control_frame_in_base_frame(admittance_pose_ik_base_frame_);
     convert_message_to_array(admittance_pose_ik_base_frame_, admittance_pose_ik_base_frame_arr_);
-  }
-
-  // Initialize ik_tip and tool_frame transformations - those are fixed transformations
-  tf2::Stamped<tf2::Transform> tf2_transform;
-  try {
-    auto transform = tf_buffer_->lookupTransform(ik_tip_frame_, control_frame_, tf2::TimePointZero);
-    tf2::fromMsg(transform, tf2_transform);
-    ik_tip_to_control_frame_tf_ = tf2_transform;
-    control_frame_to_ik_tip_tf_ = tf2_transform.inverse();
-  } catch (const tf2::TransformException & e) {
-    RCLCPP_ERROR_SKIPFIRST_THROTTLE(
-      rclcpp::get_logger("AdmittanceRule"), *clock_, 5000, "%s", e.what());
-    return controller_interface::return_type::ERROR;
   }
 
   return controller_interface::return_type::OK;
@@ -256,16 +246,6 @@ controller_interface::return_type AdmittanceRule::get_controller_state(
   state_message.measured_wrench = measured_wrench_;
   state_message.measured_wrench_filtered = measured_wrench_filtered_;
   state_message.measured_wrench_control_frame = measured_wrench_ik_base_frame_;
-
-  // FIXME(destogl): Something is wrong with this transformation - check frames...
-  try {
-    auto transform = tf_buffer_->lookupTransform(endeffector_frame_, control_frame_, tf2::TimePointZero);
-    tf2::doTransform(measured_wrench_ik_base_frame_, measured_wrench_endeffector_frame_, transform);
-  } catch (const tf2::TransformException & e) {
-    RCLCPP_ERROR_SKIPFIRST_THROTTLE(
-      rclcpp::get_logger("AdmittanceRule"), *clock_, 5000, "%s", e.what());
-  }
-  state_message.measured_wrench_endeffector_frame = measured_wrench_endeffector_frame_;
 
   state_message.admittance_rule_calculated_values = admittance_rule_calculated_values_;
 
