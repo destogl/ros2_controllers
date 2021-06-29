@@ -88,6 +88,9 @@ protected:
   std::unique_ptr<admittance_controller::AdmittanceRule> admittance_;
   rclcpp::Time previous_time_;
 
+  // Callback for updating dynamic parameters
+  rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr on_set_callback_handle_;
+
   // Command subscribers and Controller State publisher
   using ControllerCommandWrenchMsg = geometry_msgs::msg::WrenchStamped;
   using ControllerCommandPoseMsg = geometry_msgs::msg::PoseStamped;
