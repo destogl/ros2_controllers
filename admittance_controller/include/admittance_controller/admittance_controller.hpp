@@ -76,7 +76,6 @@ protected:
   std::vector<std::string> state_interface_types_;
   std::string ft_sensor_name_;
   bool use_joint_commands_as_input_;
-  bool joint_mode_;
 
   bool hardware_state_has_offset_;
   trajectory_msgs::msg::JointTrajectoryPoint last_commanded_state_;

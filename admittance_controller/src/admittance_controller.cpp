@@ -33,7 +33,7 @@
 #include "joint_limits/joint_limits_rosparam.hpp"
 #include "trajectory_msgs/msg/joint_trajectory_point.hpp"
 
-constexpr size_t ROS_LOG_THROTTLE_PERIOD = 30 * 1000;  // Milliseconds to throttle logs inside loops
+constexpr size_t ROS_LOG_THROTTLE_PERIOD = 1 * 1000;  // Milliseconds to throttle logs inside loops
 
 namespace admittance_controller
 {
@@ -56,7 +56,6 @@ controller_interface::return_type AdmittanceController::init(const std::string &
     get_node()->declare_parameter<std::vector<std::string>>("state_interfaces", {});
     get_node()->declare_parameter<std::string>("ft_sensor_name", "");
     get_node()->declare_parameter<bool>("use_joint_commands_as_input", false);
-    get_node()->declare_parameter<bool>("joint_mode", false);
     get_node()->declare_parameter<bool>("open_loop_control", false);
 
     get_node()->declare_parameter<std::string>("IK.base", "");
@@ -176,7 +175,6 @@ CallbackReturn AdmittanceController::on_configure(
     get_string_array_param_and_error_if_empty(state_interface_types_, "state_interfaces") ||
     get_string_param_and_error_if_empty(ft_sensor_name_, "ft_sensor_name") ||
     get_bool_param_and_error_if_empty(use_joint_commands_as_input_, "use_joint_commands_as_input") ||
-    get_bool_param_and_error_if_empty(joint_mode_, "joint_mode") ||
     get_bool_param_and_error_if_empty(admittance_->open_loop_control_, "open_loop_control") ||
     get_string_param_and_error_if_empty(admittance_->ik_base_frame_, "IK.base") ||
     get_string_param_and_error_if_empty(admittance_->ik_tip_frame_, "IK.tip") ||
@@ -584,6 +582,7 @@ controller_interface::return_type AdmittanceController::update()
 //   }
   previous_time_ = get_node()->now();
 
+  // TODO: Replace with limit plugin
   if(current_joint_states.velocities.empty()) {
     // First update() after activating does not have velocity available, assume 0
     current_joint_states.velocities.resize(num_joints, 0.0);
@@ -634,21 +633,13 @@ controller_interface::return_type AdmittanceController::update()
         RCLCPP_WARN_STREAM_THROTTLE(get_node()->get_logger(), *get_node()->get_clock(), ROS_LOG_THROTTLE_PERIOD, "Joint(s) would exceed position limits, limiting");
         position_limit_triggered = true;
 
-        if(joint_mode_) {
-          // Apply maximum acceleration away from joint limit
-          double accel_sign = (joint_limits_[index].max_position - current_joint_states.positions[index] < stopping_distance) ? -1.0 : 1.0;
-          desired_joint_states.velocities[index] = current_joint_states.velocities[index] + copysign(joint_limits_[index].max_acceleration, accel_sign) * duration_since_last_call.seconds();
-          // Recompute position
-          desired_joint_states.positions[index] = current_joint_states.positions[index] + current_joint_states.velocities[index] * duration_since_last_call.seconds() + 0.5 * copysign(joint_limits_[index].max_acceleration, accel_sign) * duration_since_last_call.seconds() * duration_since_last_call.seconds();
-        } else {
-            // We will limit all joints
-            break;
-        }
+        // We will limit all joints
+        break;
       }
     }
   }
 
-  if (position_limit_triggered && !joint_mode_) {
+  if (position_limit_triggered) {
     // In Cartesian admittance mode, stop all joints if one would exceed limit
     for (auto index = 0u; index < num_joints; ++index) {
       if(joint_limits_[index].has_acceleration_limits) {
@@ -663,6 +654,7 @@ controller_interface::return_type AdmittanceController::update()
       }
     }
   }
+  // End limit plugin
 
   // Write new joint angles to the robot
   for (auto index = 0u; index < num_joints; ++index) {
