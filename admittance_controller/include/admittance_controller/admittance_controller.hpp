@@ -17,7 +17,6 @@
 #ifndef ADMITTANCE_CONTROLLER__ADMITTANCE_CONTROLLER_HPP_
 #define ADMITTANCE_CONTROLLER__ADMITTANCE_CONTROLLER_HPP_
 
-#include <limits>
 #include <memory>
 #include <string>
 #include <vector>
