@@ -28,6 +28,7 @@
 #include "builtin_interfaces/msg/time.hpp"
 #include "hardware_interface/types/hardware_interface_return_values.hpp"
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
+#include "joint_limits/joint_limits_rosparam.hpp"
 #include "joint_trajectory_controller/trajectory.hpp"
 #include "lifecycle_msgs/msg/state.hpp"
 #include "rclcpp/logging.hpp"
@@ -41,6 +42,8 @@
 #include "rclcpp_lifecycle/node_interfaces/lifecycle_node_interface.hpp"
 #include "rclcpp_lifecycle/state.hpp"
 #include "std_msgs/msg/header.hpp"
+
+constexpr size_t ROS_LOG_THROTTLE_PERIOD = 1 * 1000;  // Milliseconds to throttle logs inside loops
 
 namespace joint_trajectory_controller
 {
@@ -159,6 +162,7 @@ JointTrajectoryController::update()
     // if sampling the first time, set the point before you sample
     if (!(*traj_point_active_ptr_)->is_sampled_already()) {
       if (open_loop_control_) {
+        // TODO: Should we be setting state_current to last_commanded_state_ here?
         (*traj_point_active_ptr_)->set_point_before_trajectory_msg(
           node_->now(), last_commanded_state_);
       } else {
@@ -172,7 +176,7 @@ JointTrajectoryController::update()
     TrajectoryPointConstIter start_segment_itr, end_segment_itr;
     const bool valid_point = (*traj_point_active_ptr_)->sample(
       node_->now(), state_desired,
-      start_segment_itr, end_segment_itr);
+      start_segment_itr, end_segment_itr, joint_limits_);
 
     if (valid_point) {
       bool abort = false;
@@ -526,6 +530,24 @@ JointTrajectoryController::on_configure(const rclcpp_lifecycle::State &)
     get_interface_list(command_interface_types_).c_str(),
     get_interface_list(state_interface_types_).c_str());
 
+  const auto n_joints = joint_names_.size();
+
+  // Initialize joint limits
+  joint_limits_.resize(n_joints);
+  for (auto i = 0ul; i < n_joints; ++i) {
+    joint_limits::declare_parameters(joint_names_[i], get_node());
+    joint_limits::get_joint_limits(joint_names_[i], get_node(), joint_limits_[i]);
+    RCLCPP_INFO(get_node()->get_logger(), "Joint '%s':\n  has position limits: %s [%e, %e]"
+                "\n  has velocity limits: %s [%e]\n  has acceleration limits: %s [%e]",
+                joint_names_[i].c_str(), joint_limits_[i].has_position_limits ? "true" : "false",
+                joint_limits_[i].min_position, joint_limits_[i].max_position,
+                joint_limits_[i].has_velocity_limits ? "true" : "false",
+                joint_limits_[i].max_velocity,
+                joint_limits_[i].has_acceleration_limits ? "true" : "false",
+                joint_limits_[i].max_acceleration
+               );
+  }
+
   default_tolerances_ = get_segment_tolerances(*node_, joint_names_);
 
   // Read parameters customizing controller for special cases
@@ -575,8 +597,6 @@ JointTrajectoryController::on_configure(const rclcpp_lifecycle::State &)
     "~/state", rclcpp::SystemDefaultsQoS());
   state_publisher_ = std::make_unique<StatePublisher>(publisher_);
 
-  const auto n_joints = joint_names_.size();
-
   state_publisher_->lock();
   state_publisher_->msg_.joint_names = joint_names_;
   state_publisher_->msg_.desired.positions.resize(n_joints);
@@ -622,6 +642,7 @@ JointTrajectoryController::on_configure(const rclcpp_lifecycle::State &)
     std::bind(&JointTrajectoryController::feedback_setup_callback, this, _1)
   );
 
+  RCLCPP_INFO(get_node()->get_logger(), "configure successful");
   return rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn::SUCCESS;
 }
 

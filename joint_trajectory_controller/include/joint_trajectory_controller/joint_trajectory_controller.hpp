@@ -25,6 +25,7 @@
 #include "control_msgs/action/follow_joint_trajectory.hpp"
 #include "controller_interface/controller_interface.hpp"
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
+#include "joint_limits/joint_limits.hpp"
 #include "joint_trajectory_controller/tolerances.hpp"
 #include "joint_trajectory_controller/visibility_control.h"
 #include "rclcpp/duration.hpp"
@@ -129,6 +130,9 @@ protected:
   /// This is useful when robot is not exactly following the commanded trajectory.
   bool open_loop_control_ = false;
   trajectory_msgs::msg::JointTrajectoryPoint last_commanded_state_;
+
+  std::vector<joint_limits::JointLimits> joint_limits_;
+
   /// Allow integration in goal trajectories to accept goals without position or velocity specified
   bool allow_integration_in_goal_trajectories_ = false;
 
