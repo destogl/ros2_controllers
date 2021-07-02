@@ -64,19 +64,11 @@ INSTANTIATE_TEST_CASE_P(
       rclcpp::ParameterValue("")
     ),
     std::make_tuple(
-      std::string("IK.tip"),
-      rclcpp::ParameterValue("")
-    ),
-    std::make_tuple(
       std::string("IK.group_name"),
       rclcpp::ParameterValue("")
     ),
     std::make_tuple(
       std::string("control_frame"),
-      rclcpp::ParameterValue("")
-    ),
-    std::make_tuple(
-      std::string("fixed_world_frame"),
       rclcpp::ParameterValue("")
     ),
     std::make_tuple(
@@ -211,9 +203,7 @@ TEST_F(AdmittanceControllerTest, all_parameters_set_configure_success)
 
   ASSERT_EQ(controller_->ft_sensor_name_, ft_sensor_name_);
   ASSERT_EQ(controller_->admittance_->ik_base_frame_, ik_base_frame_);
-  ASSERT_EQ(controller_->admittance_->ik_tip_frame_, ik_tip_frame_);
   //   ASSERT_EQ(controller_->admittance_->ik_group_name_, ik_group_name_);
-  ASSERT_EQ(controller_->admittance_->fixed_world_frame_, fixed_world_frame_);
   ASSERT_EQ(controller_->admittance_->sensor_frame_, sensor_frame_);
 
   ASSERT_TRUE(!controller_->admittance_->selected_axes_.empty());
