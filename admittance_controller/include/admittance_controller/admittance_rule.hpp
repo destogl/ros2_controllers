@@ -23,6 +23,7 @@
 #include "admittance_controller/moveit_kinematics.hpp"
 #include "control_msgs/msg/admittance_controller_state.hpp"
 #include "controller_interface/controller_interface.hpp"
+#include "controller_interface/controller_parameters.hpp"
 #include "filters/filter_chain.hpp"
 #include "geometry_msgs/msg/quaternion.hpp"
 #include "geometry_msgs/msg/pose_stamped.hpp"
@@ -163,16 +164,105 @@ void convert_array_to_message(const Type & vector, geometry_msgs::msg::Transform
 
 }  // utility namespace
 
-
 namespace admittance_controller
 {
-struct GravityCompensationParameters
+
+class AdmittanceParameters : public controller_interface::ControllerParameters
 {
 public:
-  std::string world_frame_;
-  std::string sensor_frame_;
-  geometry_msgs::msg::Vector3Stamped cog_;
-  double force_;
+  AdmittanceParameters() : controller_interface::ControllerParameters(6, 24)
+  {
+    add_bool_parameter("admittance.selected_axes.x", true);
+    add_bool_parameter("admittance.selected_axes.y", true);
+    add_bool_parameter("admittance.selected_axes.z", true);
+    add_bool_parameter("admittance.selected_axes.rx", true);
+    add_bool_parameter("admittance.selected_axes.ry", true);
+    add_bool_parameter("admittance.selected_axes.rz", true);
+    
+    add_double_parameter("admittance.mass.x", true);
+    add_double_parameter("admittance.mass.y", true);
+    add_double_parameter("admittance.mass.z", true);
+    add_double_parameter("admittance.mass.rx", true);
+    add_double_parameter("admittance.mass.ry", true);
+    add_double_parameter("admittance.mass.rz", true);
+    add_double_parameter("admittance.stiffness.x", true);
+    add_double_parameter("admittance.stiffness.y", true);
+    add_double_parameter("admittance.stiffness.z", true);
+    add_double_parameter("admittance.stiffness.rx", true);
+    add_double_parameter("admittance.stiffness.ry", true);
+    add_double_parameter("admittance.stiffness.rz", true);
+    add_double_parameter("admittance.damping.x", true);
+    add_double_parameter("admittance.damping.y", true);
+    add_double_parameter("admittance.damping.z", true);
+    add_double_parameter("admittance.damping.rx", true);
+    add_double_parameter("admittance.damping.ry", true);
+    add_double_parameter("admittance.damping.rz", true);
+    add_double_parameter("admittance.damping_ratio.x", true);
+    add_double_parameter("admittance.damping_ratio.y", true);
+    add_double_parameter("admittance.damping_ratio.z", true);
+    add_double_parameter("admittance.damping_ratio.rx", true);
+    add_double_parameter("admittance.damping_ratio.ry", true);
+    add_double_parameter("admittance.damping_ratio.rz", true);
+  }
+  
+  bool check_if_parameters_are_valid(rclcpp::Node::SharedPtr node) override
+  {
+    bool ret = true;
+    int index = 0;
+    // check if parameters are all properly set for selected axes
+    for (auto i = 0ul; i < bool_parameters_.size(); ++i) {
+      if (bool_parameters_[index].second) {
+        // check mass parameters
+        index = i;
+        if (std::isnan(double_parameters_[index].second)) {
+          RCLCPP_ERROR(node->get_logger(), 
+                       "Parameter '%s' has to be set", 
+                       double_parameters_[index].first.name.c_str());
+          ret = false;
+        }
+        // Check stiffness parameters
+        index = i + 6;
+        if (std::isnan(double_parameters_[index].second)) {
+          RCLCPP_ERROR(node->get_logger(), 
+                       "Parameter '%s' has to be set", 
+                       double_parameters_[index].first.name.c_str());
+          ret = false;
+        }
+        // Check damping or damping_ratio parameters
+        index = i + 12;
+        if (std::isnan(double_parameters_[index].second) && 
+            std::isnan(double_parameters_[index + 6].second)
+        ) {
+          RCLCPP_ERROR(node->get_logger(), 
+                       "Either parameter '%s' of '%s' has to be set", 
+                       double_parameters_[index].first.name.c_str(),
+                       double_parameters_[index + 6].first.name.c_str()
+                      );
+          ret = false;
+        }
+      }
+    }
+    
+    return ret;
+  }
+  
+  void update() override
+  {
+    for (auto i = 0ul; i < 6; ++i) {
+      selected_axes_[i] = bool_parameters_[i].second;
+      
+      mass_[i] = double_parameters_[i].second;
+      stiffness_[i] = double_parameters_[i+6].second;
+      damping_[i] = double_parameters_[i+12].second;
+      damping_ratio_[i] = double_parameters_[i+18].second;
+    }
+  }
+    
+  std::array<double, 6> damping_;
+  std::array<double, 6> damping_ratio_;
+  std::array<double, 6> mass_;
+  std::array<bool, 6> selected_axes_;
+  std::array<double, 6> stiffness_;
 };
 
 struct DynamicAdmittanceParameters
@@ -301,7 +391,8 @@ public:
    * Conversion to damping when damping_ratio (zeta) parameter is used.
    * Using formula: D = damping_ratio * 2 * sqrt( M * S )
    */
-  void convert_damping_ratio_to_damping() {
+  void convert_damping_ratio_to_damping() 
+  {
     for (auto i = 0ul; i < dynamic_param_.damping_ratio_.size(); ++i) {
       if (!std::isnan(dynamic_param_.damping_ratio_[i])) {
         dynamic_param_.damping_[i] = dynamic_param_.damping_ratio_[i] * 2 * sqrt(dynamic_param_.mass_[i] * dynamic_param_.stiffness_[i]);
@@ -332,7 +423,7 @@ public:
   bool unified_mode_ = false;  // Unified mode enables simultaneous force and position goals
 
   // Dynamic admittance parameters
-  DynamicAdmittanceParameters dynamic_param_;
+  AdmittanceParameters dynamic_param_;
 
   // Filter chain for Wrench data
   std::unique_ptr<filters::FilterChain<geometry_msgs::msg::WrenchStamped>> filter_chain_;
