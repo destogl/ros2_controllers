@@ -17,11 +17,13 @@
 #ifndef ADMITTANCE_CONTROLLER__ADMITTANCE_RULE_HPP_
 #define ADMITTANCE_CONTROLLER__ADMITTANCE_RULE_HPP_
 
-#include "angles/angles.h"
+#include <map>
 
+#include "angles/angles.h"
 #include "admittance_controller/moveit_kinematics.hpp"
 #include "control_msgs/msg/admittance_controller_state.hpp"
 #include "controller_interface/controller_interface.hpp"
+#include "controller_interface/controller_parameters.hpp"
 #include "filters/filter_chain.hpp"
 #include "geometry_msgs/msg/quaternion.hpp"
 #include "geometry_msgs/msg/pose_stamped.hpp"
@@ -29,6 +31,7 @@
 #include "geometry_msgs/msg/wrench_stamped.hpp"
 #include "tf2_ros/transform_listener.h"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.h"
+#include "rcutils/logging_macros.h"
 
 namespace {  // Utility namespace
 
@@ -162,16 +165,188 @@ void convert_array_to_message(const Type & vector, geometry_msgs::msg::Transform
 
 }  // utility namespace
 
-
 namespace admittance_controller
 {
-struct GravityCompensationParameters
+
+class AdmittanceParameters : public controller_interface::ControllerParameters
 {
 public:
-  std::string world_frame_;
-  std::string sensor_frame_;
-  geometry_msgs::msg::Vector3Stamped cog_;
-  double force_;
+  AdmittanceParameters() : controller_interface::ControllerParameters(6, 24)
+  {
+    add_bool_parameter("admittance.selected_axes.x", true);
+    add_bool_parameter("admittance.selected_axes.y", true);
+    add_bool_parameter("admittance.selected_axes.z", true);
+    add_bool_parameter("admittance.selected_axes.rx", true);
+    add_bool_parameter("admittance.selected_axes.ry", true);
+    add_bool_parameter("admittance.selected_axes.rz", true);
+    
+    add_double_parameter("admittance.mass.x", true);
+    add_double_parameter("admittance.mass.y", true);
+    add_double_parameter("admittance.mass.z", true);
+    add_double_parameter("admittance.mass.rx", true);
+    add_double_parameter("admittance.mass.ry", true);
+    add_double_parameter("admittance.mass.rz", true);
+    add_double_parameter("admittance.stiffness.x", true);
+    add_double_parameter("admittance.stiffness.y", true);
+    add_double_parameter("admittance.stiffness.z", true);
+    add_double_parameter("admittance.stiffness.rx", true);
+    add_double_parameter("admittance.stiffness.ry", true);
+    add_double_parameter("admittance.stiffness.rz", true);
+    add_double_parameter("admittance.damping.x", true);
+    add_double_parameter("admittance.damping.y", true);
+    add_double_parameter("admittance.damping.z", true);
+    add_double_parameter("admittance.damping.rx", true);
+    add_double_parameter("admittance.damping.ry", true);
+    add_double_parameter("admittance.damping.rz", true);
+    add_double_parameter("admittance.damping_ratio.x", true);
+    add_double_parameter("admittance.damping_ratio.y", true);
+    add_double_parameter("admittance.damping_ratio.z", true);
+    add_double_parameter("admittance.damping_ratio.rx", true);
+    add_double_parameter("admittance.damping_ratio.ry", true);
+    add_double_parameter("admittance.damping_ratio.rz", true);
+  }
+  
+  bool check_if_parameters_are_valid() override
+  {
+    bool ret = true;
+    int index = 0;
+    // check if parameters are all properly set for selected axes
+    for (auto i = 0ul; i < bool_parameters_.size(); ++i) {
+      if (bool_parameters_[index].second) {
+        // check mass parameters
+        index = i;
+        if (std::isnan(double_parameters_[index].second)) {
+          RCUTILS_LOG_ERROR_NAMED(
+            logger_name_.c_str(),
+            "Parameter '%s' has to be set", double_parameters_[index].first.name.c_str());
+          ret = false;
+        }
+        // Check stiffness parameters
+        index = i + 6;
+        if (std::isnan(double_parameters_[index].second)) {
+          RCUTILS_LOG_ERROR_NAMED(
+            logger_name_.c_str(),
+            "Parameter '%s' has to be set", double_parameters_[index].first.name.c_str());
+          ret = false;
+        }
+        // Check damping or damping_ratio parameters
+        index = i + 12;
+        if (std::isnan(double_parameters_[index].second) && 
+            std::isnan(double_parameters_[index + 6].second)
+        ) {
+          RCUTILS_LOG_ERROR_NAMED(
+            logger_name_.c_str(),
+            "Either parameter '%s' of '%s' has to be set", 
+            double_parameters_[index].first.name.c_str(),
+            double_parameters_[index + 6].first.name.c_str()
+          );
+          ret = false;
+        }
+      }
+    }
+    
+    return ret;
+  }
+  
+  void update() override
+  {
+    for (auto i = 0ul; i < 6; ++i) {
+      selected_axes_[i] = bool_parameters_[i].second;
+      
+      mass_[i] = double_parameters_[i].second;
+      stiffness_[i] = double_parameters_[i+6].second;
+      damping_[i] = double_parameters_[i+12].second;
+      damping_ratio_[i] = double_parameters_[i+18].second;
+    }
+  }
+    
+  std::array<double, 6> damping_;
+  std::array<double, 6> damping_ratio_;
+  std::array<double, 6> mass_;
+  std::array<bool, 6> selected_axes_;
+  std::array<double, 6> stiffness_;
+};
+
+struct DynamicAdmittanceParameters
+{
+public:
+  // Reconfigure updated parameters
+  bool update(std::shared_ptr<rclcpp::Node> node)
+  {
+    // Check for updated selected_axes_
+    std::map<std::string, std::pair<bool, bool>>::iterator axes_iterator;
+    for (axes_iterator = selected_axes_map_.begin(); axes_iterator != selected_axes_map_.end();
+         ++axes_iterator) {
+      // If parameter got changed, update configuration
+      if (axes_iterator->second.second) {
+        axes_iterator->second.first = node->get_parameter(axes_iterator->first).get_value<bool>();
+        RCLCPP_INFO(node->get_logger(),
+          "Successfully updated param '%s', new value: '%d'", axes_iterator->first.c_str(), axes_iterator->second.first);
+
+        axes_iterator->second.second = false;
+      }
+    }
+    // Check for updated mass, stiffness, damping or damping_ratio values
+    std::map<std::string, std::pair<double, bool>>::iterator m_s_d_iterator;
+    for (m_s_d_iterator = mass_stiffness_damping_map_.begin();
+         m_s_d_iterator != mass_stiffness_damping_map_.end(); ++m_s_d_iterator) {
+      // If parameter got changed, update configuration
+      if (m_s_d_iterator->second.second) {
+        m_s_d_iterator->second.first =
+          node->get_parameter(m_s_d_iterator->first).get_value<double>();
+        RCLCPP_INFO(node->get_logger(),
+          "Successfully updated param '%s', new value: '%f'",
+          m_s_d_iterator->first.c_str(), m_s_d_iterator->second.first);
+        m_s_d_iterator->second.second = false;
+      }
+    }
+    return true;
+  };
+  // Admittance parameters
+  // Arrays with dynamic paramter values
+  std::array<bool, 6> selected_axes_;
+  std::array<double, 6> mass_;
+  std::array<double, 6> damping_;
+  std::array<double, 6> damping_ratio_;
+  std::array<double, 6> stiffness_;
+
+  // Map of pairs <selected_axes, value_updated>
+  std::map<std::string, std::pair<bool, bool>> selected_axes_map_ = {
+    {"admittance.selected_axes.x", {selected_axes_[0], false}},
+    {"admittance.selected_axes.y", {selected_axes_[1], false}},
+    {"admittance.selected_axes.z", {selected_axes_[2], false}},
+    {"admittance.selected_axes.rx", {selected_axes_[3], false}},
+    {"admittance.selected_axes.ry", {selected_axes_[4], false}},
+    {"admittance.selected_axes.rz", {selected_axes_[5], false}}
+  };
+
+  // Map of pairs <mass/stiffness/damping, value_updated>
+  std::map<std::string, std::pair<double, bool>> mass_stiffness_damping_map_ = {
+    {"admittance.mass.x", {mass_[0], false}},
+    {"admittance.mass.y", {mass_[1], false}},
+    {"admittance.mass.z", {mass_[2], false}},
+    {"admittance.mass.rx", {mass_[3], false}},
+    {"admittance.mass.ry", {mass_[4], false}},
+    {"admittance.mass.rz", {mass_[5], false}},
+    {"admittance.damping.x", {damping_[0], false}},
+    {"admittance.damping.y", {damping_[1], false}},
+    {"admittance.damping.z", {damping_[2], false}},
+    {"admittance.damping.rx", {damping_[3], false}},
+    {"admittance.damping.ry", {damping_[4], false}},
+    {"admittance.damping.rz", {damping_[5], false}},
+    {"admittance.stiffness.x", {stiffness_[0], false}},
+    {"admittance.stiffness.y", {stiffness_[1], false}},
+    {"admittance.stiffness.z", {stiffness_[2], false}},
+    {"admittance.stiffness.rx", {stiffness_[3], false}},
+    {"admittance.stiffness.ry", {stiffness_[4], false}},
+    {"admittance.stiffness.rz", {stiffness_[5], false}},
+    {"admittance.damping_ratio.x", {damping_ratio_[0], false}},
+    {"admittance.damping_ratio.y", {damping_ratio_[1], false}},
+    {"admittance.damping_ratio.z", {damping_ratio_[2], false}},
+    {"admittance.damping_ratio.rx", {damping_ratio_[3], false}},
+    {"admittance.damping_ratio.ry", {damping_ratio_[4], false}},
+    {"admittance.damping_ratio.rz", {damping_ratio_[5], false}}
+  };
 };
 
 class AdmittanceRule
@@ -218,10 +393,11 @@ public:
    * Conversion to damping when damping_ratio (zeta) parameter is used.
    * Using formula: D = damping_ratio * 2 * sqrt( M * S )
    */
-  void convert_damping_ratio_to_damping() {
-    for (auto i = 0ul; i < damping_ratio_.size(); ++i) {
-      if (!std::isnan(damping_ratio_[i])) {
-        damping_[i] = damping_ratio_[i] * 2 * sqrt(mass_[i] * stiffness_[i]);
+  void convert_damping_ratio_to_damping() 
+  {
+    for (auto i = 0ul; i < dynamic_param_.damping_ratio_.size(); ++i) {
+      if (!std::isnan(dynamic_param_.damping_ratio_[i])) {
+        dynamic_param_.damping_[i] = dynamic_param_.damping_ratio_[i] * 2 * sqrt(dynamic_param_.mass_[i] * dynamic_param_.stiffness_[i]);
       }
     }
   }
@@ -247,11 +423,9 @@ public:
   // Admittance parameters
   // TODO(destogl): unified mode does not have to be here
   bool unified_mode_ = false;  // Unified mode enables simultaneous force and position goals
-  std::array<bool, 6> selected_axes_;
-  std::array<double, 6> mass_;
-  std::array<double, 6> damping_;
-  std::array<double, 6> damping_ratio_;
-  std::array<double, 6> stiffness_;
+
+  // Dynamic admittance parameters
+  AdmittanceParameters dynamic_param_;
 
   // Filter chain for Wrench data
   std::unique_ptr<filters::FilterChain<geometry_msgs::msg::WrenchStamped>> filter_chain_;

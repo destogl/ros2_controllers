@@ -68,40 +68,42 @@ controller_interface::return_type AdmittanceController::init(const std::string &
 
     // TODO(destogl): enable when force/position control is implemented
 //     get_node()->declare_parameter<bool>("admitance.unified_mode", false);
-    get_node()->declare_parameter<bool>("admittance.selected_axes.x", false);
-    get_node()->declare_parameter<bool>("admittance.selected_axes.y", false);
-    get_node()->declare_parameter<bool>("admittance.selected_axes.z", false);
-    get_node()->declare_parameter<bool>("admittance.selected_axes.rx", false);
-    get_node()->declare_parameter<bool>("admittance.selected_axes.ry", false);
-    get_node()->declare_parameter<bool>("admittance.selected_axes.rz", false);
-
-    get_node()->declare_parameter<double>("admittance.mass.x", std::numeric_limits<double>::quiet_NaN());
-    get_node()->declare_parameter<double>("admittance.mass.y", std::numeric_limits<double>::quiet_NaN());
-    get_node()->declare_parameter<double>("admittance.mass.z", std::numeric_limits<double>::quiet_NaN());
-    get_node()->declare_parameter<double>("admittance.mass.rx", std::numeric_limits<double>::quiet_NaN());
-    get_node()->declare_parameter<double>("admittance.mass.ry", std::numeric_limits<double>::quiet_NaN());
-    get_node()->declare_parameter<double>("admittance.mass.rz", std::numeric_limits<double>::quiet_NaN());
-
-    get_node()->declare_parameter<double>("admittance.damping.x", std::numeric_limits<double>::quiet_NaN());
-    get_node()->declare_parameter<double>("admittance.damping.y", std::numeric_limits<double>::quiet_NaN());
-    get_node()->declare_parameter<double>("admittance.damping.z", std::numeric_limits<double>::quiet_NaN());
-    get_node()->declare_parameter<double>("admittance.damping.rx", std::numeric_limits<double>::quiet_NaN());
-    get_node()->declare_parameter<double>("admittance.damping.ry", std::numeric_limits<double>::quiet_NaN());
-    get_node()->declare_parameter<double>("admittance.damping.rz", std::numeric_limits<double>::quiet_NaN());
-
-    get_node()->declare_parameter<double>("admittance.damping_ratio.x", std::numeric_limits<double>::quiet_NaN());
-    get_node()->declare_parameter<double>("admittance.damping_ratio.y", std::numeric_limits<double>::quiet_NaN());
-    get_node()->declare_parameter<double>("admittance.damping_ratio.z", std::numeric_limits<double>::quiet_NaN());
-    get_node()->declare_parameter<double>("admittance.damping_ratio.rx", std::numeric_limits<double>::quiet_NaN());
-    get_node()->declare_parameter<double>("admittance.damping_ratio.ry", std::numeric_limits<double>::quiet_NaN());
-    get_node()->declare_parameter<double>("admittance.damping_ratio.rz", std::numeric_limits<double>::quiet_NaN());
-
-    get_node()->declare_parameter<double>("admittance.stiffness.x", std::numeric_limits<double>::quiet_NaN());
-    get_node()->declare_parameter<double>("admittance.stiffness.y", std::numeric_limits<double>::quiet_NaN());
-    get_node()->declare_parameter<double>("admittance.stiffness.z", std::numeric_limits<double>::quiet_NaN());
-    get_node()->declare_parameter<double>("admittance.stiffness.rx", std::numeric_limits<double>::quiet_NaN());
-    get_node()->declare_parameter<double>("admittance.stiffness.ry", std::numeric_limits<double>::quiet_NaN());
-    get_node()->declare_parameter<double>("admittance.stiffness.rz", std::numeric_limits<double>::quiet_NaN());
+//     get_node()->declare_parameter<bool>("admittance.selected_axes.x", false);
+//     get_node()->declare_parameter<bool>("admittance.selected_axes.y", false);
+//     get_node()->declare_parameter<bool>("admittance.selected_axes.z", false);
+//     get_node()->declare_parameter<bool>("admittance.selected_axes.rx", false);
+//     get_node()->declare_parameter<bool>("admittance.selected_axes.ry", false);
+//     get_node()->declare_parameter<bool>("admittance.selected_axes.rz", false);
+// 
+//     get_node()->declare_parameter<double>("admittance.mass.x", std::numeric_limits<double>::quiet_NaN());
+//     get_node()->declare_parameter<double>("admittance.mass.y", std::numeric_limits<double>::quiet_NaN());
+//     get_node()->declare_parameter<double>("admittance.mass.z", std::numeric_limits<double>::quiet_NaN());
+//     get_node()->declare_parameter<double>("admittance.mass.rx", std::numeric_limits<double>::quiet_NaN());
+//     get_node()->declare_parameter<double>("admittance.mass.ry", std::numeric_limits<double>::quiet_NaN());
+//     get_node()->declare_parameter<double>("admittance.mass.rz", std::numeric_limits<double>::quiet_NaN());
+// 
+//     get_node()->declare_parameter<double>("admittance.damping.x", std::numeric_limits<double>::quiet_NaN());
+//     get_node()->declare_parameter<double>("admittance.damping.y", std::numeric_limits<double>::quiet_NaN());
+//     get_node()->declare_parameter<double>("admittance.damping.z", std::numeric_limits<double>::quiet_NaN());
+//     get_node()->declare_parameter<double>("admittance.damping.rx", std::numeric_limits<double>::quiet_NaN());
+//     get_node()->declare_parameter<double>("admittance.damping.ry", std::numeric_limits<double>::quiet_NaN());
+//     get_node()->declare_parameter<double>("admittance.damping.rz", std::numeric_limits<double>::quiet_NaN());
+// 
+//     get_node()->declare_parameter<double>("admittance.damping_ratio.x", std::numeric_limits<double>::quiet_NaN());
+//     get_node()->declare_parameter<double>("admittance.damping_ratio.y", std::numeric_limits<double>::quiet_NaN());
+//     get_node()->declare_parameter<double>("admittance.damping_ratio.z", std::numeric_limits<double>::quiet_NaN());
+//     get_node()->declare_parameter<double>("admittance.damping_ratio.rx", std::numeric_limits<double>::quiet_NaN());
+//     get_node()->declare_parameter<double>("admittance.damping_ratio.ry", std::numeric_limits<double>::quiet_NaN());
+//     get_node()->declare_parameter<double>("admittance.damping_ratio.rz", std::numeric_limits<double>::quiet_NaN());
+// 
+//     get_node()->declare_parameter<double>("admittance.stiffness.x", std::numeric_limits<double>::quiet_NaN());
+//     get_node()->declare_parameter<double>("admittance.stiffness.y", std::numeric_limits<double>::quiet_NaN());
+//     get_node()->declare_parameter<double>("admittance.stiffness.z", std::numeric_limits<double>::quiet_NaN());
+//     get_node()->declare_parameter<double>("admittance.stiffness.rx", std::numeric_limits<double>::quiet_NaN());
+//     get_node()->declare_parameter<double>("admittance.stiffness.ry", std::numeric_limits<double>::quiet_NaN());
+//     get_node()->declare_parameter<double>("admittance.stiffness.rz", std::numeric_limits<double>::quiet_NaN());
+    
+    admittance_->dynamic_param_.declare_parameters(get_node());
 
   } catch (const std::exception & e) {
     fprintf(stderr, "Exception thrown during init stage with message: %s \n", e.what());
@@ -143,28 +145,28 @@ CallbackReturn AdmittanceController::on_configure(
     return false; // TODO(destogl): how to check "if_empty" for bool?
   };
 
-  auto get_double_param_and_error_if_empty = [&](
-    double & parameter, const char * parameter_name) {
-    parameter = get_node()->get_parameter(parameter_name).get_value<double>();
-    if (std::isnan(parameter)) {
-      RCLCPP_ERROR(get_node()->get_logger(), "'%s' parameter was not set", parameter_name);
-      return true;
-    }
-    return false;
-  };
+//   auto get_double_param_and_error_if_empty = [&](
+//     double & parameter, const char * parameter_name) {
+//     parameter = get_node()->get_parameter(parameter_name).get_value<double>();
+//     if (std::isnan(parameter)) {
+//       RCLCPP_ERROR(get_node()->get_logger(), "'%s' parameter was not set", parameter_name);
+//       return true;
+//     }
+//     return false;
+//   };
 
-  auto get_double_params_and_error_if_both_empty_or_set = [&](
-    double & parameter, const char * parameter_name,
-    double & parameter2, const char * parameter_name2) {
-    parameter = get_node()->get_parameter(parameter_name).get_value<double>();
-    parameter2 = get_node()->get_parameter(parameter_name2).get_value<double>();
-    if (std::isnan(parameter) == std::isnan(parameter2)) {
-      RCLCPP_ERROR(get_node()->get_logger(), "'%s' and '%s' parameters were both '%s'set",
-                   parameter_name, parameter_name2, (std::isnan(parameter) ? "not " : ""));
-      return true;
-    }
-    return false;
-    };
+//   auto get_double_params_and_error_if_both_empty_or_set = [&](
+//     double & parameter, const char * parameter_name,
+//     double & parameter2, const char * parameter_name2) {
+//     parameter = get_node()->get_parameter(parameter_name).get_value<double>();
+//     parameter2 = get_node()->get_parameter(parameter_name2).get_value<double>();
+//     if (std::isnan(parameter) == std::isnan(parameter2)) {
+//       RCLCPP_ERROR(get_node()->get_logger(), "'%s' and '%s' parameters were both '%s'set",
+//                    parameter_name, parameter_name2, (std::isnan(parameter) ? "not " : ""));
+//       return true;
+//     }
+//     return false;
+//     };
 
   if (
     get_string_array_param_and_error_if_empty(joint_names_, "joints") ||
@@ -178,49 +180,84 @@ CallbackReturn AdmittanceController::on_configure(
     get_string_param_and_error_if_empty(admittance_->control_frame_, "control_frame") ||
     get_string_param_and_error_if_empty(admittance_->sensor_frame_, "sensor_frame") ||
 
-    get_bool_param_and_error_if_empty(admittance_->selected_axes_[0], "admittance.selected_axes.x") ||
-    get_bool_param_and_error_if_empty(admittance_->selected_axes_[1], "admittance.selected_axes.y") ||
-    get_bool_param_and_error_if_empty(admittance_->selected_axes_[2], "admittance.selected_axes.z") ||
-    get_bool_param_and_error_if_empty(admittance_->selected_axes_[3], "admittance.selected_axes.rx") ||
-    get_bool_param_and_error_if_empty(admittance_->selected_axes_[4], "admittance.selected_axes.ry") ||
-    get_bool_param_and_error_if_empty(admittance_->selected_axes_[5], "admittance.selected_axes.rz") ||
+//     get_bool_param_and_error_if_empty(admittance_->dynamic_param_.selected_axes_[0], "admittance.selected_axes.x") ||
+//     get_bool_param_and_error_if_empty(admittance_->dynamic_param_.selected_axes_[1], "admittance.selected_axes.y") ||
+//     get_bool_param_and_error_if_empty(admittance_->dynamic_param_.selected_axes_[2], "admittance.selected_axes.z") ||
+//     get_bool_param_and_error_if_empty(admittance_->dynamic_param_.selected_axes_[3], "admittance.selected_axes.rx") ||
+//     get_bool_param_and_error_if_empty(admittance_->dynamic_param_.selected_axes_[4], "admittance.selected_axes.ry") ||
+//     get_bool_param_and_error_if_empty(admittance_->dynamic_param_.selected_axes_[5], "admittance.selected_axes.rz") ||
+// 
+//     get_double_param_and_error_if_empty(admittance_->dynamic_param_.mass_[0], "admittance.mass.x") ||
+//     get_double_param_and_error_if_empty(admittance_->dynamic_param_.mass_[1], "admittance.mass.y") ||
+//     get_double_param_and_error_if_empty(admittance_->dynamic_param_.mass_[2], "admittance.mass.z") ||
+//     get_double_param_and_error_if_empty(admittance_->dynamic_param_.mass_[3], "admittance.mass.rx") ||
+//     get_double_param_and_error_if_empty(admittance_->dynamic_param_.mass_[4], "admittance.mass.ry") ||
+//     get_double_param_and_error_if_empty(admittance_->dynamic_param_.mass_[5], "admittance.mass.rz") ||
+// 
+//     get_double_params_and_error_if_both_empty_or_set(
+//       admittance_->dynamic_param_.damping_[0], "admittance.damping.x",
+//       admittance_->dynamic_param_.damping_ratio_[0], "admittance.damping_ratio.x") ||
+//     get_double_params_and_error_if_both_empty_or_set(
+//       admittance_->dynamic_param_.damping_[1], "admittance.damping.y",
+//       admittance_->dynamic_param_.damping_ratio_[1], "admittance.damping_ratio.y") ||
+//     get_double_params_and_error_if_both_empty_or_set(
+//       admittance_->dynamic_param_.damping_[2], "admittance.damping.z",
+//       admittance_->dynamic_param_.damping_ratio_[2], "admittance.damping_ratio.z") ||
+//     get_double_params_and_error_if_both_empty_or_set(
+//       admittance_->dynamic_param_.damping_[3], "admittance.damping.rx",
+//       admittance_->dynamic_param_.damping_ratio_[3], "admittance.damping_ratio.rx") ||
+//     get_double_params_and_error_if_both_empty_or_set(
+//       admittance_->dynamic_param_.damping_[4], "admittance.damping.ry",
+//       admittance_->dynamic_param_.damping_ratio_[4], "admittance.damping_ratio.ry") ||
+//     get_double_params_and_error_if_both_empty_or_set(
+//       admittance_->dynamic_param_.damping_[5], "admittance.damping.rz",
+//       admittance_->dynamic_param_.damping_ratio_[5], "admittance.damping_ratio.rz") ||
+// 
+//     get_double_param_and_error_if_empty(admittance_->dynamic_param_.stiffness_[0], "admittance.stiffness.x") ||
+//     get_double_param_and_error_if_empty(admittance_->dynamic_param_.stiffness_[1], "admittance.stiffness.y") ||
+//     get_double_param_and_error_if_empty(admittance_->dynamic_param_.stiffness_[2], "admittance.stiffness.z") ||
+//     get_double_param_and_error_if_empty(admittance_->dynamic_param_.stiffness_[3], "admittance.stiffness.rx") ||
+//     get_double_param_and_error_if_empty(admittance_->dynamic_param_.stiffness_[4], "admittance.stiffness.ry") ||
+//     get_double_param_and_error_if_empty(admittance_->dynamic_param_.stiffness_[5], "admittance.stiffness.rz")
 
-    get_double_param_and_error_if_empty(admittance_->mass_[0], "admittance.mass.x") ||
-    get_double_param_and_error_if_empty(admittance_->mass_[1], "admittance.mass.y") ||
-    get_double_param_and_error_if_empty(admittance_->mass_[2], "admittance.mass.z") ||
-    get_double_param_and_error_if_empty(admittance_->mass_[3], "admittance.mass.rx") ||
-    get_double_param_and_error_if_empty(admittance_->mass_[4], "admittance.mass.ry") ||
-    get_double_param_and_error_if_empty(admittance_->mass_[5], "admittance.mass.rz") ||
-
-    get_double_params_and_error_if_both_empty_or_set(
-      admittance_->damping_[0], "admittance.damping.x",
-      admittance_->damping_ratio_[0], "admittance.damping_ratio.x") ||
-    get_double_params_and_error_if_both_empty_or_set(
-      admittance_->damping_[1], "admittance.damping.y",
-      admittance_->damping_ratio_[1], "admittance.damping_ratio.y") ||
-    get_double_params_and_error_if_both_empty_or_set(
-      admittance_->damping_[2], "admittance.damping.z",
-      admittance_->damping_ratio_[2], "admittance.damping_ratio.z") ||
-    get_double_params_and_error_if_both_empty_or_set(
-      admittance_->damping_[3], "admittance.damping.rx",
-      admittance_->damping_ratio_[3], "admittance.damping_ratio.rx") ||
-    get_double_params_and_error_if_both_empty_or_set(
-      admittance_->damping_[4], "admittance.damping.ry",
-      admittance_->damping_ratio_[4], "admittance.damping_ratio.ry") ||
-    get_double_params_and_error_if_both_empty_or_set(
-      admittance_->damping_[5], "admittance.damping.rz",
-      admittance_->damping_ratio_[5], "admittance.damping_ratio.rz") ||
-
-    get_double_param_and_error_if_empty(admittance_->stiffness_[0], "admittance.stiffness.x") ||
-    get_double_param_and_error_if_empty(admittance_->stiffness_[1], "admittance.stiffness.y") ||
-    get_double_param_and_error_if_empty(admittance_->stiffness_[2], "admittance.stiffness.z") ||
-    get_double_param_and_error_if_empty(admittance_->stiffness_[3], "admittance.stiffness.rx") ||
-    get_double_param_and_error_if_empty(admittance_->stiffness_[4], "admittance.stiffness.ry") ||
-    get_double_param_and_error_if_empty(admittance_->stiffness_[5], "admittance.stiffness.rz")
+      admittance_->dynamic_param_.get_parameters(get_node())
     )
   {
     return CallbackReturn::ERROR;
   }
+
+  // Add callback to dynamically update parameters
+  on_set_callback_handle_ = get_node()->add_on_set_parameters_callback(
+    [this](const std::vector<rclcpp::Parameter> & parameters) {
+      
+      return admittance_->dynamic_param_.set_parameter_callback(parameters);
+//       // Mark parameters as updated
+//       auto result = rcl_interfaces::msg::SetParametersResult();
+//       bool dynamic_parameter_changed_ = false;
+//       for (const auto & parameter : parameters) {
+//         if (
+//           admittance_->dynamic_param_.selected_axes_map_.find(parameter.get_name()) !=
+//           admittance_->dynamic_param_.selected_axes_map_.end()) {
+//           admittance_->dynamic_param_.selected_axes_map_[parameter.get_name()].second = true;
+//           dynamic_parameter_changed_ = true;
+//         }
+//         if (
+//           admittance_->dynamic_param_.mass_stiffness_damping_map_.find(parameter.get_name()) !=
+//           admittance_->dynamic_param_.mass_stiffness_damping_map_.end()) {
+//           admittance_->dynamic_param_.mass_stiffness_damping_map_[parameter.get_name()].second =
+//             true;
+//           dynamic_parameter_changed_ = true;
+//         }
+//       }
+//       if (dynamic_parameter_changed_) {
+//         RCLCPP_INFO(
+//           get_node()->get_logger(),
+//           "Dynamic admittance parameters got changed! To update the parameters internally please "
+//           "restart the controller.");
+//       }
+//       result.successful = true;
+//       return result;
+    });
 
   // Convert the damping ratio (if given) to mass/spring/damper representation
   admittance_->convert_damping_ratio_to_damping();
@@ -424,6 +461,14 @@ const
 CallbackReturn AdmittanceController::on_activate(const rclcpp_lifecycle::State & /*previous_state*/)
 {
   const auto num_joints = joint_names_.size();
+
+  // Update dynamic parameters before controller is started
+  if (!admittance_->dynamic_param_.check_if_parameters_are_valid()) {
+    RCLCPP_ERROR(get_node()->get_logger(), "Failed to update dynamic admittance parameter");
+    return rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn::ERROR;
+  } else {
+    admittance_->dynamic_param_.update();
+  }
 
   // order all joints in the storage
   for (const auto & interface : command_interface_types_) {

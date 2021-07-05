@@ -312,11 +312,11 @@ void AdmittanceRule::calculate_admittance_rule(
 {
   // Compute admittance control law: F = M*a + D*v + S*(x - x_d)
   for (auto i = 0u; i < 6; ++i) {
-    if (selected_axes_[i]) {
+    if (dynamic_param_.selected_axes_[i]) {
       // TODO(destogl): check if velocity is measured from hardware
-      const double admittance_acceleration = (1 / mass_[i]) * (measured_wrench[i] -
-                                             damping_[i] * admittance_velocity_arr_[i] -
-                                             stiffness_[i] * pose_error[i]);
+      const double admittance_acceleration = (1 / dynamic_param_.mass_[i]) * (measured_wrench[i] -
+                                             dynamic_param_.damping_[i] * admittance_velocity_arr_[i] -
+                                             dynamic_param_.stiffness_[i] * pose_error[i]);
 
       admittance_velocity_arr_[i] += admittance_acceleration * period.seconds();
 
