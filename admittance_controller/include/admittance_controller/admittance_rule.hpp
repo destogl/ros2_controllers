@@ -31,6 +31,7 @@
 #include "geometry_msgs/msg/wrench_stamped.hpp"
 #include "tf2_ros/transform_listener.h"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.h"
+#include "rcutils/logging_macros.h"
 
 namespace {  // Utility namespace
 
@@ -205,7 +206,7 @@ public:
     add_double_parameter("admittance.damping_ratio.rz", true);
   }
   
-  bool check_if_parameters_are_valid(rclcpp::Node::SharedPtr node) override
+  bool check_if_parameters_are_valid() override
   {
     bool ret = true;
     int index = 0;
@@ -215,17 +216,17 @@ public:
         // check mass parameters
         index = i;
         if (std::isnan(double_parameters_[index].second)) {
-          RCLCPP_ERROR(node->get_logger(), 
-                       "Parameter '%s' has to be set", 
-                       double_parameters_[index].first.name.c_str());
+          RCUTILS_LOG_ERROR_NAMED(
+            logger_name_.c_str(),
+            "Parameter '%s' has to be set", double_parameters_[index].first.name.c_str());
           ret = false;
         }
         // Check stiffness parameters
         index = i + 6;
         if (std::isnan(double_parameters_[index].second)) {
-          RCLCPP_ERROR(node->get_logger(), 
-                       "Parameter '%s' has to be set", 
-                       double_parameters_[index].first.name.c_str());
+          RCUTILS_LOG_ERROR_NAMED(
+            logger_name_.c_str(),
+            "Parameter '%s' has to be set", double_parameters_[index].first.name.c_str());
           ret = false;
         }
         // Check damping or damping_ratio parameters
@@ -233,11 +234,12 @@ public:
         if (std::isnan(double_parameters_[index].second) && 
             std::isnan(double_parameters_[index + 6].second)
         ) {
-          RCLCPP_ERROR(node->get_logger(), 
-                       "Either parameter '%s' of '%s' has to be set", 
-                       double_parameters_[index].first.name.c_str(),
-                       double_parameters_[index + 6].first.name.c_str()
-                      );
+          RCUTILS_LOG_ERROR_NAMED(
+            logger_name_.c_str(),
+            "Either parameter '%s' of '%s' has to be set", 
+            double_parameters_[index].first.name.c_str(),
+            double_parameters_[index + 6].first.name.c_str()
+          );
           ret = false;
         }
       }

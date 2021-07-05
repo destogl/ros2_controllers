@@ -230,7 +230,7 @@ CallbackReturn AdmittanceController::on_configure(
   on_set_callback_handle_ = get_node()->add_on_set_parameters_callback(
     [this](const std::vector<rclcpp::Parameter> & parameters) {
       
-      return admittance_->dynamic_param_.set_parameter_callback(get_node(), parameters);
+      return admittance_->dynamic_param_.set_parameter_callback(parameters);
 //       // Mark parameters as updated
 //       auto result = rcl_interfaces::msg::SetParametersResult();
 //       bool dynamic_parameter_changed_ = false;
@@ -463,7 +463,7 @@ CallbackReturn AdmittanceController::on_activate(const rclcpp_lifecycle::State &
   const auto num_joints = joint_names_.size();
 
   // Update dynamic parameters before controller is started
-  if (!admittance_->dynamic_param_.check_if_parameters_are_valid(get_node())) {
+  if (!admittance_->dynamic_param_.check_if_parameters_are_valid()) {
     RCLCPP_ERROR(get_node()->get_logger(), "Failed to update dynamic admittance parameter");
     return rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn::ERROR;
   } else {
