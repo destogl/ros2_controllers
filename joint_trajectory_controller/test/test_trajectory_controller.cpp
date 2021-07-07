@@ -435,6 +435,72 @@ TEST_P(TrajectoryControllerTestParameterized, zero_state_publish_rate)
   test_state_publish_rate_target(0);
 }
 
+TEST_P(TrajectoryControllerTestParameterized, zero_state_publish_rate1)
+{
+  test_state_publish_rate_target(0);
+}
+
+TEST_P(TrajectoryControllerTestParameterized, test_states_values_are_properly_initialized)
+{
+  rclcpp::executors::SingleThreadedExecutor executor;
+  SetUpAndActivateTrajectoryController(true, {}, &executor);
+
+  auto future_handle = std::async(
+    std::launch::async, [&executor]() -> void {
+      executor.spin();
+    });
+
+  using control_msgs::msg::JointTrajectoryControllerState;
+
+  auto callback = [this](const JointTrajectoryControllerState::UniquePtr state) -> void
+  {
+    ASSERT_TRUE(!state->joint_names.empty());
+    ASSERT_EQ(state->joint_names.size(), joint_names_.size());
+    ASSERT_TRUE(std::equal(state->joint_names.begin(), state->joint_names.end(),
+                           joint_names_.begin(), joint_names_.end()));
+
+    auto check_state_field = [&](const auto & field) -> void
+    {
+      ASSERT_EQ(field.size(), joint_names_.size());
+      for (auto i = 0ul; i < field.size(); ++i) {
+        ASSERT_FALSE(std::isnan(field[i]));
+      }
+    };
+
+    check_state_field(state->desired.positions);
+    check_state_field(state->desired.velocities);
+    check_state_field(state->desired.accelerations);
+
+    check_state_field(state->actual.positions);
+    check_state_field(state->error.positions);
+
+    // check velocity
+    if (std::find(
+        state_interface_types_.begin(), state_interface_types_.end(),
+        hardware_interface::HW_IF_VELOCITY) != state_interface_types_.end())
+    {
+      check_state_field(state->actual.velocities);
+      check_state_field(state->error.velocities);
+    }
+
+    // check acceleration
+    if (std::find(
+        state_interface_types_.begin(), state_interface_types_.end(),
+        hardware_interface::HW_IF_ACCELERATION) != state_interface_types_.end())
+    {
+      check_state_field(state->actual.accelerations);
+      check_state_field(state->error.accelerations);
+    }
+  };
+
+  const int qos_level = 10;
+  rclcpp::Subscription<JointTrajectoryControllerState>::SharedPtr subs =
+    traj_node_->create_subscription<JointTrajectoryControllerState>(
+    controller_name_ + "/state", qos_level, callback);
+
+  executor.cancel();
+}
+
 /**
  * @brief test_jumbled_joint_order Test sending trajectories with a joint order different from internal controller order
  */

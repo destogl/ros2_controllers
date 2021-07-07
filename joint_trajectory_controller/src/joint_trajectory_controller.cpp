@@ -142,6 +142,7 @@ JointTrajectoryController::update()
   JointTrajectoryPoint state_current, state_desired, state_error;
   const auto joint_num = joint_names_.size();
   resize_joint_trajectory_point(state_current, joint_num);
+  resize_joint_trajectory_point(state_error, joint_num);
 
   // TODO(anyone): can I here also use const on joint_interface since the reference_wrapper is not
   // changed, but its value only?
@@ -170,7 +171,6 @@ JointTrajectoryController::update()
           node_->now(), state_current);
       }
     }
-    resize_joint_trajectory_point(state_error, joint_num);
 
     // find segment for current timestamp
     TrajectoryPointConstIter start_segment_itr, end_segment_itr;
@@ -280,6 +280,12 @@ JointTrajectoryController::update()
           }
         }
       }
+    }
+  }
+  else {
+    state_desired = state_current;
+    for (auto index = 0ul; index < joint_num; ++index) {
+      compute_error_for_joint(state_error, index, state_current, state_desired);
     }
   }
 
