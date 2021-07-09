@@ -267,87 +267,6 @@ public:
   std::array<double, 6> stiffness_;
 };
 
-struct DynamicAdmittanceParameters
-{
-public:
-  // Reconfigure updated parameters
-  bool update(std::shared_ptr<rclcpp::Node> node)
-  {
-    // Check for updated selected_axes_
-    std::map<std::string, std::pair<bool, bool>>::iterator axes_iterator;
-    for (axes_iterator = selected_axes_map_.begin(); axes_iterator != selected_axes_map_.end();
-         ++axes_iterator) {
-      // If parameter got changed, update configuration
-      if (axes_iterator->second.second) {
-        axes_iterator->second.first = node->get_parameter(axes_iterator->first).get_value<bool>();
-        RCLCPP_INFO(node->get_logger(),
-          "Successfully updated param '%s', new value: '%d'", axes_iterator->first.c_str(), axes_iterator->second.first);
-
-        axes_iterator->second.second = false;
-      }
-    }
-    // Check for updated mass, stiffness, damping or damping_ratio values
-    std::map<std::string, std::pair<double, bool>>::iterator m_s_d_iterator;
-    for (m_s_d_iterator = mass_stiffness_damping_map_.begin();
-         m_s_d_iterator != mass_stiffness_damping_map_.end(); ++m_s_d_iterator) {
-      // If parameter got changed, update configuration
-      if (m_s_d_iterator->second.second) {
-        m_s_d_iterator->second.first =
-          node->get_parameter(m_s_d_iterator->first).get_value<double>();
-        RCLCPP_INFO(node->get_logger(),
-          "Successfully updated param '%s', new value: '%f'",
-          m_s_d_iterator->first.c_str(), m_s_d_iterator->second.first);
-        m_s_d_iterator->second.second = false;
-      }
-    }
-    return true;
-  };
-  // Admittance parameters
-  // Arrays with dynamic paramter values
-  std::array<bool, 6> selected_axes_;
-  std::array<double, 6> mass_;
-  std::array<double, 6> damping_;
-  std::array<double, 6> damping_ratio_;
-  std::array<double, 6> stiffness_;
-
-  // Map of pairs <selected_axes, value_updated>
-  std::map<std::string, std::pair<bool, bool>> selected_axes_map_ = {
-    {"admittance.selected_axes.x", {selected_axes_[0], false}},
-    {"admittance.selected_axes.y", {selected_axes_[1], false}},
-    {"admittance.selected_axes.z", {selected_axes_[2], false}},
-    {"admittance.selected_axes.rx", {selected_axes_[3], false}},
-    {"admittance.selected_axes.ry", {selected_axes_[4], false}},
-    {"admittance.selected_axes.rz", {selected_axes_[5], false}}
-  };
-
-  // Map of pairs <mass/stiffness/damping, value_updated>
-  std::map<std::string, std::pair<double, bool>> mass_stiffness_damping_map_ = {
-    {"admittance.mass.x", {mass_[0], false}},
-    {"admittance.mass.y", {mass_[1], false}},
-    {"admittance.mass.z", {mass_[2], false}},
-    {"admittance.mass.rx", {mass_[3], false}},
-    {"admittance.mass.ry", {mass_[4], false}},
-    {"admittance.mass.rz", {mass_[5], false}},
-    {"admittance.damping.x", {damping_[0], false}},
-    {"admittance.damping.y", {damping_[1], false}},
-    {"admittance.damping.z", {damping_[2], false}},
-    {"admittance.damping.rx", {damping_[3], false}},
-    {"admittance.damping.ry", {damping_[4], false}},
-    {"admittance.damping.rz", {damping_[5], false}},
-    {"admittance.stiffness.x", {stiffness_[0], false}},
-    {"admittance.stiffness.y", {stiffness_[1], false}},
-    {"admittance.stiffness.z", {stiffness_[2], false}},
-    {"admittance.stiffness.rx", {stiffness_[3], false}},
-    {"admittance.stiffness.ry", {stiffness_[4], false}},
-    {"admittance.stiffness.rz", {stiffness_[5], false}},
-    {"admittance.damping_ratio.x", {damping_ratio_[0], false}},
-    {"admittance.damping_ratio.y", {damping_ratio_[1], false}},
-    {"admittance.damping_ratio.z", {damping_ratio_[2], false}},
-    {"admittance.damping_ratio.rx", {damping_ratio_[3], false}},
-    {"admittance.damping_ratio.ry", {damping_ratio_[4], false}},
-    {"admittance.damping_ratio.rz", {damping_ratio_[5], false}}
-  };
-};
 
 class AdmittanceRule
 {
@@ -395,9 +314,9 @@ public:
    */
   void convert_damping_ratio_to_damping() 
   {
-    for (auto i = 0ul; i < dynamic_param_.damping_ratio_.size(); ++i) {
-      if (!std::isnan(dynamic_param_.damping_ratio_[i])) {
-        dynamic_param_.damping_[i] = dynamic_param_.damping_ratio_[i] * 2 * sqrt(dynamic_param_.mass_[i] * dynamic_param_.stiffness_[i]);
+    for (auto i = 0ul; i < parameters_.damping_ratio_.size(); ++i) {
+      if (!std::isnan( parameters_.damping_ratio_[i])) {
+                parameters_.damping_[i] = parameters_.damping_ratio_[i] * 2 * sqrt( parameters_.mass_[i] * parameters_.stiffness_[i]);
       }
     }
   }
@@ -425,7 +344,7 @@ public:
   bool unified_mode_ = false;  // Unified mode enables simultaneous force and position goals
 
   // Dynamic admittance parameters
-  AdmittanceParameters dynamic_param_;
+  AdmittanceParameters parameters_;
 
   // Filter chain for Wrench data
   std::unique_ptr<filters::FilterChain<geometry_msgs::msg::WrenchStamped>> filter_chain_;
