@@ -212,7 +212,7 @@ public:
     int index = 0;
     // check if parameters are all properly set for selected axes
     for (auto i = 0ul; i < bool_parameters_.size(); ++i) {
-      if (bool_parameters_[index].second) {
+      if (bool_parameters_[i].second) {
         // check mass parameters
         index = i;
         if (std::isnan(double_parameters_[index].second)) {
@@ -252,7 +252,7 @@ public:
   {
     for (auto i = 0ul; i < 6; ++i) {
       selected_axes_[i] = bool_parameters_[i].second;
-      
+
       mass_[i] = double_parameters_[i].second;
       stiffness_[i] = double_parameters_[i+6].second;
       damping_[i] = double_parameters_[i+12].second;

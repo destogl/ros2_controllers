@@ -49,6 +49,8 @@ controller_interface::return_type AdmittanceController::init(const std::string &
     return ret;
   }
 
+  admittance_ = std::make_unique<admittance_controller::AdmittanceRule>();
+
   try {
     // TODO: use variables as parameters
     get_node()->declare_parameter<std::vector<std::string>>("joints", {});
@@ -109,8 +111,6 @@ controller_interface::return_type AdmittanceController::init(const std::string &
     fprintf(stderr, "Exception thrown during init stage with message: %s \n", e.what());
     return controller_interface::return_type::ERROR;
   }
-
-  admittance_ = std::make_unique<admittance_controller::AdmittanceRule>();
 
   return controller_interface::return_type::OK;
 }
@@ -220,47 +220,13 @@ CallbackReturn AdmittanceController::on_configure(
 //     get_double_param_and_error_if_empty(admittance_->dynamic_param_.stiffness_[4], "admittance.stiffness.ry") ||
 //     get_double_param_and_error_if_empty(admittance_->dynamic_param_.stiffness_[5], "admittance.stiffness.rz")
 
-      admittance_->dynamic_param_.get_parameters(get_node())
+      !admittance_->dynamic_param_.get_parameters(get_node())
     )
   {
+    RCLCPP_ERROR(get_node()->get_logger(),
+                 "Error happend during reading parameters");
     return CallbackReturn::ERROR;
   }
-
-  // Add callback to dynamically update parameters
-  on_set_callback_handle_ = get_node()->add_on_set_parameters_callback(
-    [this](const std::vector<rclcpp::Parameter> & parameters) {
-      
-      return admittance_->dynamic_param_.set_parameter_callback(parameters);
-//       // Mark parameters as updated
-//       auto result = rcl_interfaces::msg::SetParametersResult();
-//       bool dynamic_parameter_changed_ = false;
-//       for (const auto & parameter : parameters) {
-//         if (
-//           admittance_->dynamic_param_.selected_axes_map_.find(parameter.get_name()) !=
-//           admittance_->dynamic_param_.selected_axes_map_.end()) {
-//           admittance_->dynamic_param_.selected_axes_map_[parameter.get_name()].second = true;
-//           dynamic_parameter_changed_ = true;
-//         }
-//         if (
-//           admittance_->dynamic_param_.mass_stiffness_damping_map_.find(parameter.get_name()) !=
-//           admittance_->dynamic_param_.mass_stiffness_damping_map_.end()) {
-//           admittance_->dynamic_param_.mass_stiffness_damping_map_[parameter.get_name()].second =
-//             true;
-//           dynamic_parameter_changed_ = true;
-//         }
-//       }
-//       if (dynamic_parameter_changed_) {
-//         RCLCPP_INFO(
-//           get_node()->get_logger(),
-//           "Dynamic admittance parameters got changed! To update the parameters internally please "
-//           "restart the controller.");
-//       }
-//       result.successful = true;
-//       return result;
-    });
-
-  // Convert the damping ratio (if given) to mass/spring/damper representation
-  admittance_->convert_damping_ratio_to_damping();
 
   try {
     admittance_->filter_chain_ =
@@ -407,9 +373,6 @@ CallbackReturn AdmittanceController::on_configure(
   state_publisher_->msg_.error_joint_state.positions.resize(num_joints, 0.0);
   state_publisher_->unlock();
 
-  // Configure AdmittanceRule
-  admittance_->configure(get_node());
-
   last_commanded_state_.positions.resize(num_joints);
   last_commanded_state_.velocities.resize(num_joints, 0.0);
   last_commanded_state_.accelerations.resize(num_joints, 0.0);
@@ -419,6 +382,43 @@ CallbackReturn AdmittanceController::on_configure(
   } else {
     RCLCPP_INFO(get_node()->get_logger(), "Using Cartesian input mode.");
   }
+
+  // Configure AdmittanceRule
+  admittance_->configure(get_node());
+
+  // Add callback to dynamically update parameters
+  on_set_callback_handle_ = get_node()->add_on_set_parameters_callback(
+    [this](const std::vector<rclcpp::Parameter> & parameters) {
+
+      return admittance_->dynamic_param_.set_parameter_callback(parameters);
+//       // Mark parameters as updated
+//       auto result = rcl_interfaces::msg::SetParametersResult();
+//       bool dynamic_parameter_changed_ = false;
+//       for (const auto & parameter : parameters) {
+//         if (
+//           admittance_->dynamic_param_.selected_axes_map_.find(parameter.get_name()) !=
+//           admittance_->dynamic_param_.selected_axes_map_.end()) {
+//           admittance_->dynamic_param_.selected_axes_map_[parameter.get_name()].second = true;
+//           dynamic_parameter_changed_ = true;
+//         }
+//         if (
+//           admittance_->dynamic_param_.mass_stiffness_damping_map_.find(parameter.get_name()) !=
+//           admittance_->dynamic_param_.mass_stiffness_damping_map_.end()) {
+//           admittance_->dynamic_param_.mass_stiffness_damping_map_[parameter.get_name()].second =
+//             true;
+//           dynamic_parameter_changed_ = true;
+//         }
+//       }
+//       if (dynamic_parameter_changed_) {
+//         RCLCPP_INFO(
+//           get_node()->get_logger(),
+//           "Dynamic admittance parameters got changed! To update the parameters internally please "
+//           "restart the controller.");
+//       }
+//       result.successful = true;
+//       return result;
+    });
+
   RCLCPP_INFO(get_node()->get_logger(), "configure successful");
   return CallbackReturn::SUCCESS;
 }
@@ -464,11 +464,14 @@ CallbackReturn AdmittanceController::on_activate(const rclcpp_lifecycle::State &
 
   // Update dynamic parameters before controller is started
   if (!admittance_->dynamic_param_.check_if_parameters_are_valid()) {
-    RCLCPP_ERROR(get_node()->get_logger(), "Failed to update dynamic admittance parameter");
+    RCLCPP_ERROR(get_node()->get_logger(), "Parameters are not valid and therefore will not be udpated");
     return rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn::ERROR;
   } else {
+    RCLCPP_ERROR(get_node()->get_logger(), "Parameters are valid!");
     admittance_->dynamic_param_.update();
   }
+  // Convert the damping ratio (if given) to mass/spring/damper representation
+  admittance_->convert_damping_ratio_to_damping();
 
   // order all joints in the storage
   for (const auto & interface : command_interface_types_) {
