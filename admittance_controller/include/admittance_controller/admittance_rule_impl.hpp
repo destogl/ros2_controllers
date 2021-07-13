@@ -38,27 +38,27 @@ controller_interface::return_type AdmittanceRule::configure(rclcpp::Node::Shared
   tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 
   // Initialize variables used in the update loop
-  measured_wrench_.header.frame_id = sensor_frame_;
+  measured_wrench_.header.frame_id = parameters_.sensor_frame_;
 
   // The variables represent transformation within the same frame
-  relative_admittance_pose_ik_base_frame_.header.frame_id = ik_base_frame_;
-  relative_admittance_pose_ik_base_frame_.child_frame_id = ik_base_frame_;
-  relative_admittance_pose_control_frame_.header.frame_id = control_frame_;
-  relative_admittance_pose_control_frame_.child_frame_id = control_frame_;
+  relative_admittance_pose_ik_base_frame_.header.frame_id = parameters_.ik_base_frame_;
+  relative_admittance_pose_ik_base_frame_.child_frame_id = parameters_.ik_base_frame_;
+  relative_admittance_pose_control_frame_.header.frame_id = parameters_.control_frame_;
+  relative_admittance_pose_control_frame_.child_frame_id = parameters_.control_frame_;
 
   // The variables represent transformation within the same frame
-  admittance_velocity_ik_base_frame_.header.frame_id = ik_base_frame_;
-  admittance_velocity_ik_base_frame_.child_frame_id = ik_base_frame_;
-  admittance_velocity_control_frame_.header.frame_id = control_frame_;
-  admittance_velocity_control_frame_.child_frame_id = control_frame_;
+  admittance_velocity_ik_base_frame_.header.frame_id = parameters_.ik_base_frame_;
+  admittance_velocity_ik_base_frame_.child_frame_id = parameters_.ik_base_frame_;
+  admittance_velocity_control_frame_.header.frame_id = parameters_.control_frame_;
+  admittance_velocity_control_frame_.child_frame_id = parameters_.control_frame_;
 
-  sum_of_admittance_displacements_.header.frame_id = ik_base_frame_;
+  sum_of_admittance_displacements_.header.frame_id = parameters_.ik_base_frame_;
 
   reference_joint_deltas_vec_.reserve(6);
   reference_deltas_vec_ik_base_.reserve(6);
   // The variables represent transformation within the same frame
-  reference_deltas_ik_base_.header.frame_id = ik_base_frame_;
-  reference_deltas_ik_base_.child_frame_id = ik_base_frame_;
+  reference_deltas_ik_base_.header.frame_id = parameters_.ik_base_frame_;
+  reference_deltas_ik_base_.child_frame_id = parameters_.ik_base_frame_;
 
   identity_transform_.transform.rotation.w = 1;
 
@@ -70,7 +70,7 @@ controller_interface::return_type AdmittanceRule::configure(rclcpp::Node::Shared
   admittance_rule_calculated_values_.effort.resize(6, 0.0);
 
   // Initialize IK
-  ik_ = std::make_shared<MoveItKinematics>(node, ik_group_name_);
+  ik_ = std::make_shared<MoveItKinematics>(node, parameters_.ik_group_name_);
 
   return controller_interface::return_type::OK;
 }
@@ -88,7 +88,7 @@ controller_interface::return_type AdmittanceRule::reset()
 
   // "Open-loop" controller uses old desired pose as current pose: current_pose(K) = desired_pose(K-1)
   // Therefore desired pose has to be set before calling *update*-method
-  if (open_loop_control_) {
+  if (parameters_.open_loop_control_) {
     get_pose_of_control_frame_in_base_frame(admittance_pose_ik_base_frame_);
     convert_message_to_array(admittance_pose_ik_base_frame_, admittance_pose_ik_base_frame_arr_);
   }
@@ -110,10 +110,10 @@ controller_interface::return_type AdmittanceRule::update(
 
   std::array<double, 6> pose_error;
   geometry_msgs::msg::TransformStamped pose_error_pose;
-  pose_error_pose.header.frame_id = ik_base_frame_;
-  pose_error_pose.child_frame_id = control_frame_;
+  pose_error_pose.header.frame_id = parameters_.ik_base_frame_;
+  pose_error_pose.child_frame_id = parameters_.control_frame_;
 
-  if (!open_loop_control_) {
+  if (!parameters_.open_loop_control_) {
     get_pose_of_control_frame_in_base_frame(current_pose_ik_base_frame_);
 
     // Convert all data to arrays for simpler calculation
@@ -191,7 +191,7 @@ controller_interface::return_type AdmittanceRule::update(
 
   // Get feed-forward cartesian deltas in the ik_base frame.
   // Since ik_base is MoveIt's working frame, the transform is identity.
-  identity_transform_.header.frame_id = ik_base_frame_;
+  identity_transform_.header.frame_id = parameters_.ik_base_frame_;
   ik_->update_robot_state(current_joint_state);
   if (!ik_->convert_joint_deltas_to_cartesian_deltas(
       reference_joint_deltas_vec_, identity_transform_, reference_deltas_vec_ik_base_))
@@ -259,7 +259,7 @@ controller_interface::return_type AdmittanceRule::get_controller_state(
 controller_interface::return_type AdmittanceRule::get_pose_of_control_frame_in_base_frame(geometry_msgs::msg::PoseStamped & pose)
 {
   try {
-    auto transform = tf_buffer_->lookupTransform(ik_base_frame_, control_frame_, tf2::TimePointZero);
+    auto transform = tf_buffer_->lookupTransform(parameters_.ik_base_frame_, parameters_.control_frame_, tf2::TimePointZero);
 
     pose.header = transform.header;
     pose.pose.position.x = transform.transform.translation.x;
@@ -343,7 +343,7 @@ controller_interface::return_type AdmittanceRule::calculate_desired_joint_state(
 )
 {
   // Since ik_base is MoveIt's working frame, the transform is identity.
-  identity_transform_.header.frame_id = ik_base_frame_;
+  identity_transform_.header.frame_id = parameters_.ik_base_frame_;
 
   // Use Jacobian-based IK
   std::vector<double> relative_admittance_pose_vec(relative_pose.begin(), relative_pose.end());

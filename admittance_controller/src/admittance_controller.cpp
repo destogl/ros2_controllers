@@ -58,15 +58,15 @@ controller_interface::return_type AdmittanceController::init(const std::string &
     get_node()->declare_parameter<std::vector<std::string>>("state_interfaces", {});
     get_node()->declare_parameter<std::string>("ft_sensor_name", "");
     get_node()->declare_parameter<bool>("use_joint_commands_as_input", false);
-    get_node()->declare_parameter<bool>("open_loop_control", false);
+//     get_node()->declare_parameter<bool>("open_loop_control", false);
 
-    get_node()->declare_parameter<std::string>("IK.base", "");
-    // TODO(destogl): enable when IK-plugin support is added
-//     get_node()->declare_parameter<std::string>("IK.plugin", "");
-    get_node()->declare_parameter<std::string>("IK.group_name", "");
-
-    get_node()->declare_parameter<std::string>("control_frame", "");
-    get_node()->declare_parameter<std::string>("sensor_frame", "");
+//     get_node()->declare_parameter<std::string>("IK.base", "");
+//     // TODO(destogl): enable when IK-plugin support is added
+// //     get_node()->declare_parameter<std::string>("IK.plugin", "");
+//     get_node()->declare_parameter<std::string>("IK.group_name", "");
+//
+//     get_node()->declare_parameter<std::string>("control_frame", "");
+//     get_node()->declare_parameter<std::string>("sensor_frame", "");
 
     admittance_->parameters_.declare_parameters(get_node());
 
@@ -114,11 +114,11 @@ CallbackReturn AdmittanceController::on_configure(
     get_string_array_param_and_error_if_empty(state_interface_types_, "state_interfaces") ||
     get_string_param_and_error_if_empty(ft_sensor_name_, "ft_sensor_name") ||
     get_bool_param_and_error_if_empty(use_joint_commands_as_input_, "use_joint_commands_as_input") ||
-    get_bool_param_and_error_if_empty(admittance_->open_loop_control_, "open_loop_control") ||
-    get_string_param_and_error_if_empty(admittance_->ik_base_frame_, "IK.base") ||
-    get_string_param_and_error_if_empty(admittance_->ik_group_name_, "IK.group_name") ||
-    get_string_param_and_error_if_empty(admittance_->control_frame_, "control_frame") ||
-    get_string_param_and_error_if_empty(admittance_->sensor_frame_, "sensor_frame") ||
+//     get_bool_param_and_error_if_empty(admittance_->open_loop_control_, "open_loop_control") ||
+//     get_string_param_and_error_if_empty(admittance_->ik_base_frame_, "IK.base") ||
+//     get_string_param_and_error_if_empty(admittance_->ik_group_name_, "IK.group_name") ||
+//     get_string_param_and_error_if_empty(admittance_->control_frame_, "control_frame") ||
+//     get_string_param_and_error_if_empty(admittance_->sensor_frame_, "sensor_frame") ||
 
       !admittance_->parameters_.get_parameters(get_node())
     )
@@ -386,7 +386,7 @@ CallbackReturn AdmittanceController::on_activate(const rclcpp_lifecycle::State &
 
   // Set initial command values - initialize all to simplify update
   std::shared_ptr<ControllerCommandWrenchMsg> msg_wrench = std::make_shared<ControllerCommandWrenchMsg>();
-  msg_wrench->header.frame_id = admittance_->control_frame_;
+  msg_wrench->header.frame_id = admittance_->parameters_.control_frame_;
   input_wrench_command_.writeFromNonRT(msg_wrench);
 
   std::shared_ptr<ControllerCommandJointMsg> msg_joint = std::make_shared<ControllerCommandJointMsg>();
@@ -405,13 +405,13 @@ CallbackReturn AdmittanceController::on_activate(const rclcpp_lifecycle::State &
   input_joint_command_.writeFromNonRT(msg_joint);
 
   std::shared_ptr<ControllerCommandPoseMsg> msg_pose = std::make_shared<ControllerCommandPoseMsg>();
-  msg_pose->header.frame_id = admittance_->control_frame_;
+  msg_pose->header.frame_id = admittance_->parameters_.control_frame_;
   if (admittance_->get_pose_of_control_frame_in_base_frame(*msg_pose) !=
       controller_interface::return_type::OK)
   {
     RCLCPP_ERROR(node_->get_logger(),
                  "Can not find transform from '%s' to '%s' needed in the update loop",
-                 admittance_->ik_base_frame_, admittance_->control_frame_);
+                 admittance_->parameters_.ik_base_frame_, admittance_->parameters_.control_frame_);
     return rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn::ERROR;
   }
   input_pose_command_.writeFromNonRT(msg_pose);
@@ -456,7 +456,7 @@ controller_interface::return_type AdmittanceController::update()
 
   read_state_from_hardware(current_joint_states);
 
-  if (admittance_->open_loop_control_) {
+  if (admittance_->parameters_.open_loop_control_) {
     // TODO(destogl): This may not work in every case.
     // Please add checking which states are available and which not!
     current_joint_states = last_commanded_state_;

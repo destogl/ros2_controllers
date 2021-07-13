@@ -202,32 +202,32 @@ TEST_F(AdmittanceControllerTest, all_parameters_set_configure_success)
                          state_interface_types_.begin(), state_interface_types_.end()));
 
   ASSERT_EQ(controller_->ft_sensor_name_, ft_sensor_name_);
-  ASSERT_EQ(controller_->admittance_->ik_base_frame_, ik_base_frame_);
-  //   ASSERT_EQ(controller_->admittance_->ik_group_name_, ik_group_name_);
-  ASSERT_EQ(controller_->admittance_->sensor_frame_, sensor_frame_);
+  ASSERT_EQ(controller_->admittance_->parameters_.ik_base_frame_, ik_base_frame_);
+  //   ASSERT_EQ(controller_->admittance_->parameters_.ik_group_name_, ik_group_name_);
+  ASSERT_EQ(controller_->admittance_->parameters_.sensor_frame_, sensor_frame_);
 
-  ASSERT_TRUE(!controller_->admittance_->dynamic_param_.selected_axes_.empty());
-  ASSERT_TRUE(controller_->admittance_->dynamic_param_.selected_axes_.size() == admittance_selected_axes_.size());
+  ASSERT_TRUE(!controller_->admittance_->parameters_.selected_axes_.empty());
+  ASSERT_TRUE(controller_->admittance_->parameters_.selected_axes_.size() == admittance_selected_axes_.size());
   ASSERT_TRUE(std::equal(
-    controller_->admittance_->dynamic_param_.selected_axes_.begin(), controller_->admittance_->dynamic_param_.selected_axes_.end(),
+    controller_->admittance_->parameters_.selected_axes_.begin(), controller_->admittance_->parameters_.selected_axes_.end(),
                          admittance_selected_axes_.begin(), admittance_selected_axes_.end()));
 
-  ASSERT_TRUE(!controller_->admittance_->dynamic_param_.mass_.empty());
-  ASSERT_TRUE(controller_->admittance_->dynamic_param_.mass_.size() == admittance_mass_.size());
+  ASSERT_TRUE(!controller_->admittance_->parameters_.mass_.empty());
+  ASSERT_TRUE(controller_->admittance_->parameters_.mass_.size() == admittance_mass_.size());
   ASSERT_TRUE(std::equal(
-    controller_->admittance_->dynamic_param_.mass_.begin(), controller_->admittance_->dynamic_param_.mass_.end(),
+    controller_->admittance_->parameters_.mass_.begin(), controller_->admittance_->parameters_.mass_.end(),
                          admittance_mass_.begin(), admittance_mass_.end()));
 
-  ASSERT_TRUE(!controller_->admittance_->dynamic_param_.damping_.empty());
-  ASSERT_TRUE(controller_->admittance_->dynamic_param_.damping_.size() == admittance_damping_.size());
+  ASSERT_TRUE(!controller_->admittance_->parameters_.damping_.empty());
+  ASSERT_TRUE(controller_->admittance_->parameters_.damping_.size() == admittance_damping_.size());
   ASSERT_TRUE(std::equal(
-    controller_->admittance_->dynamic_param_.damping_.begin(), controller_->admittance_->dynamic_param_.damping_.end(),
+    controller_->admittance_->parameters_.damping_.begin(), controller_->admittance_->parameters_.damping_.end(),
                          admittance_damping_.begin(), admittance_damping_.end()));
 
-  ASSERT_TRUE(!controller_->admittance_->dynamic_param_.stiffness_.empty());
-  ASSERT_TRUE(controller_->admittance_->dynamic_param_.stiffness_.size() == admittance_stiffness_.size());
+  ASSERT_TRUE(!controller_->admittance_->parameters_.stiffness_.empty());
+  ASSERT_TRUE(controller_->admittance_->parameters_.stiffness_.size() == admittance_stiffness_.size());
   ASSERT_TRUE(std::equal(
-    controller_->admittance_->dynamic_param_.stiffness_.begin(), controller_->admittance_->dynamic_param_.stiffness_.end(),
+    controller_->admittance_->parameters_.stiffness_.begin(), controller_->admittance_->parameters_.stiffness_.end(),
                          admittance_stiffness_.begin(), admittance_stiffness_.end()));
 }
 

@@ -173,6 +173,13 @@ class AdmittanceParameters : public controller_interface::ControllerParameters
 public:
   AdmittanceParameters() : controller_interface::ControllerParameters(6, 24)
   {
+    add_string_parameter("IK.base", false);
+    add_string_parameter("IK.group_name", false);
+    add_string_parameter("control_frame", true);
+    add_string_parameter("sensor_frame", false);
+
+    add_bool_parameter("open_loop_control", true);
+
     add_bool_parameter("admittance.selected_axes.x", true);
     add_bool_parameter("admittance.selected_axes.y", true);
     add_bool_parameter("admittance.selected_axes.z", true);
@@ -209,10 +216,15 @@ public:
   bool check_if_parameters_are_valid() override
   {
     bool ret = true;
+
+    // Check if any string parameter is empty
+    ret = !empty_parameter_in_list(string_parameters_);
+
     int index = 0;
+    int offset_index_bool = 1;
     // check if parameters are all properly set for selected axes
-    for (auto i = 0ul; i < bool_parameters_.size(); ++i) {
-      if (bool_parameters_[i].second) {
+    for (auto i = 0ul; i < 6; ++i) {
+      if (bool_parameters_[offset_index_bool + i].second) {
         // check mass parameters
         index = i;
         if (std::isnan(double_parameters_[index].second)) {
@@ -250,8 +262,15 @@ public:
   
   void update() override
   {
+    ik_base_frame_ = string_parameters_[0].second;
+    ik_group_name_ = string_parameters_[1].second;
+    control_frame_ = string_parameters_[3].second;
+    sensor_frame_ = string_parameters_[2].second;
+
+    open_loop_control_ = bool_parameters_[0].second;
+
     for (auto i = 0ul; i < 6; ++i) {
-      selected_axes_[i] = bool_parameters_[i].second;
+      selected_axes_[i] = bool_parameters_[i+1].second;
 
       mass_[i] = double_parameters_[i].second;
       stiffness_[i] = double_parameters_[i+6].second;
@@ -259,6 +278,17 @@ public:
       damping_ratio_[i] = double_parameters_[i+18].second;
     }
   }
+
+  // IK parameters
+  std::string ik_base_frame_;
+  std::string ik_group_name_;
+  // Admittance calculations (displacement etc) are done in this frame.
+  // Frame where wrench measurements are taken
+  std::string sensor_frame_;
+  // Depends on the scenario: usually base_link, tool or end-effector
+  std::string control_frame_;
+
+  bool open_loop_control_;
     
   std::array<double, 6> damping_;
   std::array<double, 6> damping_ratio_;
@@ -322,19 +352,8 @@ public:
   }
 
 public:
-  bool open_loop_control_ = false;
   // TODO(destogl): Add parameter for this
   bool feedforward_commanded_input_ = true;
-
-  // IK related parameters
-  std::string ik_base_frame_;
-  std::string ik_group_name_;
-
-  // Admittance calculations (displacement etc) are done in this frame.
-  // Depends on the scenario: usually base_link, tool or end-effector
-  std::string control_frame_;
-  // Frame where wrench measurements are taken
-  std::string sensor_frame_;
 
   // An identity matrix is needed in several places
   geometry_msgs::msg::TransformStamped identity_transform_;
@@ -439,14 +458,14 @@ private:
   controller_interface::return_type
   transform_to_control_frame(const MsgType & message_in, MsgType & message_out)
   {
-    return transform_to_frame(message_in, message_out, control_frame_);
+    return transform_to_frame(message_in, message_out, parameters_.control_frame_);
   }
 
   template<typename MsgType>
   controller_interface::return_type
   transform_to_ik_base_frame(const MsgType & message_in, MsgType & message_out)
   {
-    return transform_to_frame(message_in, message_out, ik_base_frame_);
+    return transform_to_frame(message_in, message_out, parameters_.ik_base_frame_);
   }
 
   template<typename MsgType>
@@ -473,14 +492,14 @@ private:
   controller_interface::return_type
   transform_relative_to_control_frame(const MsgType & message_in, MsgType & message_out)
   {
-    return transform_relative_to_frame(message_in, message_out, control_frame_);
+    return transform_relative_to_frame(message_in, message_out, parameters_.control_frame_);
   }
 
   template<typename MsgType>
   controller_interface::return_type
   transform_relative_to_ik_base_frame(const MsgType & message_in, MsgType & message_out)
   {
-    return transform_relative_to_frame(message_in, message_out, ik_base_frame_);
+    return transform_relative_to_frame(message_in, message_out, parameters_.ik_base_frame_);
   }
 
   /**
